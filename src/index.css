@@ -13,12 +13,8 @@ body {
   color: var(--color-text);
   height: 100vh;
   background-color: var(--color-background);
-  font-family:
-    Roboto,
-    Arial,
-    Helvetica,
-    Helvetica Neue,
-    serif;
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
 }
 
 ::-webkit-scrollbar {
@@ -26,19 +22,64 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  box-shadow: inset 0 0 6px grey;
-  background-color: var(--color-background);
+  background-color: var(--swarm-surface-deep);
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--color-text);
-  outline: 1px solid var(--color-zingo);
+  background-color: #2a251f;
+  border-radius: 10px;
+  outline: none;
+}
+
+::selection {
+  background: var(--swarm-orange-wash);
+}
+
+/*
+ * The mark's ambient float (style guide, section 11: "Hover — the bee is
+ * alive"). Decoration only; `Global.css` neutralises it for anyone who has
+ * asked their system not to animate.
+ */
+@keyframes swarmhover {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(3deg);
+  }
+}
+
+@keyframes swarmwingleft {
+  0%,
+  100% {
+    transform: rotate(-28deg);
+  }
+  50% {
+    transform: rotate(-40deg);
+  }
+}
+
+@keyframes swarmwingright {
+  0%,
+  100% {
+    transform: rotate(28deg);
+  }
+  50% {
+    transform: rotate(40deg);
+  }
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
 }
 
 h2 {
   margin: 0;
   font-size: 2.25rem;
-  font-weight: bold;
+  font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--color-text);
 }

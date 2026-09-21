@@ -1,10 +1,101 @@
+/*
+ * The SWARM theme.
+ *
+ * Every colour here comes from the project style guide
+ * (`Swarm Style Guide v2`, sections 03 Color, 04 Typography, 05 Spacing).
+ * Nothing in this file is a preference: the roles are the guide's.
+ *
+ * Two of them matter more than the rest:
+ *
+ *   Hive Orange is the brand *and* the shielded state. They are deliberately
+ *   the same colour — private is what this wallet looks like.
+ *
+ *   Clear Blue appears only where privacy is switched off: a transparent
+ *   address, a revealed amount, an action that puts something on-chain in the
+ *   open. It is a cool break from a warm palette so a visible transaction can
+ *   never look like a normal one. Nothing else may use it.
+ *
+ * The eight `--color-*` names at the bottom are the ones the application has
+ * always used, kept and re-pointed rather than replaced, so every screen picks
+ * the theme up at once instead of being restyled one rule at a time.
+ */
 :root {
-  --color-background-dark: #040c17;
-  --color-background: #06172d;
-  --color-primary: #43a637;
-  --color-primary-disable: #23692f;
-  --color-zingo: #7c8494;
-  --color-text: #dadfe1;
-  --color-error: red;
-  --color-warning: yellow;
+  /* Surfaces — warm black, like the inside of a hive. */
+  --swarm-surface-deep: #0a0908;
+  --swarm-surface: #100e0c;
+  --swarm-surface-raised: #171411;
+  --swarm-surface-sunken: #0c0b09;
+  --swarm-hairline: rgba(255, 255, 255, 0.08);
+  --swarm-hairline-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text, brightest to faintest. */
+  --swarm-text: #f5efe4;
+  --swarm-text-soft: #d9d1c4;
+  --swarm-text-muted: #a89f92;
+  --swarm-text-faint: #7d746a;
+  --swarm-text-dim: #6b645a;
+  --swarm-text-disabled: #544e45;
+
+  /* Brand, and the shielded state. */
+  --swarm-orange: #ff8a1f;
+  --swarm-honey: #ffb020;
+  --swarm-honey-light: #ffd08a;
+  --swarm-on-orange: #1a0f02;
+  --swarm-orange-glow: rgba(255, 138, 31, 0.4);
+  --swarm-orange-wash: rgba(255, 138, 31, 0.1);
+  --swarm-orange-edge: rgba(255, 138, 31, 0.35);
+
+  /* Privacy off. Only ever this. */
+  --swarm-clear-blue: #6fb6ff;
+  --swarm-clear-blue-wash: rgba(111, 182, 255, 0.1);
+  --swarm-clear-blue-edge: rgba(111, 182, 255, 0.5);
+
+  --swarm-green: #3dd68c;
+  --swarm-red: #ff5c5c;
+  --swarm-red-edge: rgba(255, 92, 92, 0.4);
+
+  /*
+   * Sora for display, Manrope for reading, JetBrains Mono for anything that is
+   * a number, a hash or an address.
+   *
+   * The three families are named first and never fetched: this application
+   * must not reach the network for a font. Until the files are bundled (see
+   * src/assets/fonts/README.md) the fallbacks below are what actually renders,
+   * so the roles hold even where the faces do not.
+   */
+  --font-display: "Sora", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-text: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Roboto Mono", monospace;
+
+  /* 8-point rhythm; radii grow with the surface. */
+  --radius-s: 8px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+  --radius-xl: 16px;
+
+  /* Names the application already uses, pointed at the theme. */
+  --color-background: var(--swarm-surface-deep);
+  --color-background-dark: var(--swarm-surface-raised);
+  --color-primary: var(--swarm-orange);
+  --color-primary-disable: var(--swarm-text-faint);
+  --color-zingo: var(--swarm-text-dim);
+  --color-text: var(--swarm-text);
+  --color-error: var(--swarm-red);
+  --color-warning: var(--swarm-honey);
+}
+
+/*
+ * Motion is decoration here — a flowing card edge, a hovering bee. Anyone who
+ * has asked their system not to animate gets none of it, and every screen
+ * still reads the same. Section 11 of the guide.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

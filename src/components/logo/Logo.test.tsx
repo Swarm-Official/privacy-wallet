@@ -12,14 +12,14 @@ describe("Logo", () => {
     expect(screen.getByText(`${SWARM_APP_NAME} v${APP_VERSION}`)).toBeInTheDocument();
   });
 
-  it("shows the logo image when onlyVersion is false", () => {
+  it("shows the hive-bee mark when onlyVersion is false", () => {
     render(<Logo onlyVersion={false} readOnly={false} />);
-    expect(screen.getByRole("img", { name: /logo/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /swarm/i })).toBeInTheDocument();
   });
 
-  it("hides the logo image when onlyVersion is true", () => {
+  it("hides the hive-bee mark when onlyVersion is true", () => {
     render(<Logo onlyVersion={true} readOnly={false} />);
-    expect(screen.queryByRole("img", { name: /logo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /swarm/i })).not.toBeInTheDocument();
   });
 
   it("shows snowflake icon when readOnly is true", () => {

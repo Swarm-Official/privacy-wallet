@@ -278,6 +278,68 @@ describe("SendConfirmModal", () => {
       expect(await screen.findByText("Deshielded")).toBeInTheDocument();
     });
 
+    // Style guide section 06: an action that reduces privacy never wears the
+    // orange primary, and it asks first. The verdict driving this is the
+    // wallet's own; nothing about how the transaction is built changes.
+    it("confirms in Clear Blue, and says what will be visible, before a send that is not shielded", async () => {
+      (native.parse_address as jest.Mock).mockResolvedValue(
+        JSON.stringify({
+          status: "success",
+          chain_name: ServerChainNameEnum.mainChainName,
+          address_kind: "transparent",
+          receivers_available: [],
+        }),
+      );
+      render(<SendConfirmModal {...makeProps({ toaddr: { amount: 1 }, balance: { confirmedOrchardBalance: 10 } })} />, {
+        contextOverrides: { currentWallet: mainnetWallet },
+      });
+
+      expect(await screen.findByRole("button", { name: "Send anyway" })).toBeInTheDocument();
+      expect(screen.getByText(/will not be fully shielded/i)).toBeInTheDocument();
+      expect(screen.getByText(/stays on the chain for good/i)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Send shielded" })).toBeNull();
+      expect(screen.getByTestId("privacy-pill")).toHaveAttribute("data-state", "revealed");
+    });
+
+    it("keeps the plain primary, and no warning, when the send is shielded", async () => {
+      (native.parse_address as jest.Mock).mockResolvedValue(
+        JSON.stringify({
+          status: "success",
+          chain_name: ServerChainNameEnum.mainChainName,
+          address_kind: "unified",
+          receivers_available: ["orchard"],
+        }),
+      );
+      render(<SendConfirmModal {...makeProps({ toaddr: { amount: 1 }, balance: { confirmedOrchardBalance: 10 } })} />, {
+        contextOverrides: { currentWallet: mainnetWallet },
+      });
+
+      expect(await screen.findByRole("button", { name: "Send shielded" })).toBeInTheDocument();
+      expect(screen.queryByText(/will not be fully shielded/i)).toBeNull();
+      expect(screen.getByTestId("privacy-pill")).toHaveAttribute("data-state", "shielded");
+    });
+
+    // A verdict the wallet could not reach is not a claim either way: it must
+    // not be dressed up as shielded, and it must not raise a warning it cannot
+    // justify.
+    it("claims nothing when it has no verdict", async () => {
+      (native.parse_address as jest.Mock).mockResolvedValue(
+        JSON.stringify({
+          status: "success",
+          chain_name: ServerChainNameEnum.mainChainName,
+          address_kind: "unified",
+          receivers_available: ["orchard"],
+        }),
+      );
+      render(<SendConfirmModal {...makeProps({ toaddr: { amount: 100 }, balance: { confirmedOrchardBalance: 1 } })} />, {
+        contextOverrides: { currentWallet: mainnetWallet },
+      });
+
+      expect(await screen.findByRole("button", { name: "Send" })).toBeInTheDocument();
+      expect(screen.queryByText(/will not be fully shielded/i)).toBeNull();
+      expect(screen.queryByTestId("privacy-pill")).toBeNull();
+    });
+
     it("returns '-' when amount exceeds all available funds", async () => {
       (native.parse_address as jest.Mock).mockResolvedValue(
         JSON.stringify({

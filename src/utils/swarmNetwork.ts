@@ -84,6 +84,22 @@ export const swarmPresetFor = (uri: string): SwarmServerPreset | undefined =>
   SWARM_SERVER_PRESETS.find((preset) => preset.uri === uri);
 
 /**
+ * The cell a hidden digit folds into (style guide, section 07: masked values).
+ * A hexagon rather than an asterisk — the value goes back into the hive.
+ */
+export const MASK_CELL = "⬢";
+
+/**
+ * An amount with its digits hidden, for when balances are not to be read over
+ * someone's shoulder. The shape of the number survives — separators stay where
+ * they were — so a masked figure still looks like the figure it is hiding.
+ */
+export const maskAmount = (amount: string, ticker: string = SWARM_TICKER): string => {
+  const masked = amount.replace(/\d/g, MASK_CELL);
+  return ticker ? `${masked} ${ticker}` : masked;
+};
+
+/**
  * What to say when a server on this chain does not answer.
  *
  * The default preset is the case worth naming: `lwd.swarm.green` is the

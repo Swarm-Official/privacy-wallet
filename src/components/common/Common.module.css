@@ -10,9 +10,43 @@
 
 .well {
   background-color: var(--color-background-dark);
+  border: 1px solid var(--swarm-hairline);
+  border-radius: var(--radius-l);
   padding: 16px;
   padding-top: 11px;
   padding-bottom: 11px;
+}
+
+/*
+ * A card with the guide's flowing top edge: a thread of light that runs along
+ * the top of anything carrying a live figure (section 08). Decoration, so a
+ * reduced-motion preference stops it — the edge stays, the light stops moving.
+ */
+.flowcard {
+  composes: well;
+  position: relative;
+  overflow: hidden;
+}
+
+.flowcard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--swarm-orange), transparent);
+  background-size: 200% 100%;
+  animation: swarmflow 3.4s linear infinite;
+}
+
+@keyframes swarmflow {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .verticalflex {
@@ -54,12 +88,72 @@
   font-size: 12px;
 }
 
+/*
+ * Anything that is a number, a hash or an address (section 04). Already
+ * applied wherever the application showed a figure; the face is now the
+ * guide's rather than whatever `monospace` resolves to.
+ */
 .fixedfont {
-  font-family: monospace;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .sublight {
-  color: var(--color-primary-disable);
+  color: var(--swarm-text-muted);
+}
+
+/*
+ * State pills (section 07). Shielded carries the brand colour; revealed
+ * carries Clear Blue, because a visible amount is privacy switched off.
+ *
+ * The guide also shows a COINBASE pill. Nothing in this wallet reports
+ * whether an output is a maturing coinbase yet, so there is no pill for it
+ * here — a state with no data behind it would be decoration pretending to be
+ * information.
+ */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-hairline);
+  background: var(--swarm-surface-raised);
+  font-size: 12px;
+  color: var(--swarm-text-soft);
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.pillshielded {
+  composes: pill;
+  border-color: var(--swarm-orange-edge);
+  background: var(--swarm-orange-wash);
+  color: var(--swarm-honey);
+}
+
+.pillrevealed {
+  composes: pill;
+  border-color: var(--swarm-clear-blue-edge);
+  background: var(--swarm-clear-blue-wash);
+  color: var(--swarm-clear-blue);
+}
+
+/*
+ * A hidden amount. Hexagons, not asterisks: the value folds into the cells of
+ * the hive rather than being blanked out (section 07, masked values).
+ */
+.maskedamount {
+  font-family: var(--font-mono);
+  letter-spacing: 0.2em;
+  color: var(--swarm-honey);
 }
 
 .center {
@@ -95,36 +189,98 @@
   gap: 20px;
 }
 
+/*
+ * Buttons, section 06. One orange primary per view, and the orange carries a
+ * warm glow rather than a shadow — depth in this system comes from light, not
+ * from grey.
+ */
 .primarybutton {
   background-color: var(--color-primary);
-  color: var(--color-text);
+  color: var(--swarm-on-orange);
+  font-family: var(--font-display);
   text-align: center;
-  font-weight: bold;
-  font-size: 16px;
-  padding: 10px 20px;
-  border-radius: 4px;
-  border-color: var(--color-primary);
+  font-weight: 600;
+  font-size: 15px;
+  padding: 11px 22px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--color-primary);
+  box-shadow: 0 0 26px var(--swarm-orange-glow);
   margin-left: 8px;
   margin-right: 8px;
   cursor: pointer;
-  transition: filter 0.15s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
 }
 
 .primarybutton:hover {
-  filter: brightness(1.15);
+  box-shadow: 0 0 40px rgba(255, 138, 31, 0.7);
+  transform: translateY(-2px);
 }
 
 .primarybutton:active {
-  filter: brightness(0.9);
+  transform: translateY(0);
+  filter: brightness(0.92);
 }
 
 .primarybutton:disabled,
 .primarybutton[disabled] {
-  border: 1px solid var(--color-primary);
-  background-color: var(--color-primary-disable);
-  color: var(--color-text);
+  border: 1px solid var(--swarm-hairline);
+  background-color: rgba(255, 255, 255, 0.03);
+  color: var(--swarm-text-disabled);
+  box-shadow: none;
   cursor: not-allowed;
+  transform: none;
   filter: none;
+}
+
+/* The quiet one beside it: same shape, no glow, nothing claimed. */
+.secondarybutton {
+  composes: primarybutton;
+  background-color: transparent;
+  border-color: var(--swarm-hairline-strong);
+  color: var(--swarm-text-soft);
+  box-shadow: none;
+}
+
+.secondarybutton:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  transform: none;
+}
+
+/*
+ * An action that reduces privacy. Never filled: an outline in Clear Blue, so
+ * it cannot be pressed by reflex the way the orange primary can, and it is
+ * the only kind of button allowed to wear that colour (section 06).
+ */
+.revealbutton {
+  composes: primarybutton;
+  background-color: transparent;
+  border-color: var(--swarm-clear-blue-edge);
+  color: var(--swarm-clear-blue);
+  box-shadow: none;
+}
+
+.revealbutton:hover {
+  background-color: var(--swarm-clear-blue-wash);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Destructive: stop, delete, cancel something that does not come back. */
+.dangerbutton {
+  composes: primarybutton;
+  background-color: transparent;
+  border-color: var(--swarm-red-edge);
+  color: var(--swarm-red);
+  box-shadow: none;
+}
+
+.dangerbutton:hover {
+  background-color: rgba(255, 92, 92, 0.1);
+  box-shadow: none;
+  transform: none;
 }
 
 .marginnegativetitle {
@@ -207,13 +363,15 @@
 .fieldrow {
   display: flex;
   align-items: center;
-  border-radius: 12px;
-  border: 1px solid var(--color-zingo);
-  background-color: var(--color-background-dark);
+  border-radius: var(--radius-m);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: var(--swarm-surface-raised);
 }
 
+/* Calm inputs, a single orange focus ring (section 08). */
 .fieldrow:focus-within {
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.2);
 }
 
 .fieldinput {

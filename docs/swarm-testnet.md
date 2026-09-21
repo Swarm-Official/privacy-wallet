@@ -48,6 +48,25 @@ The artifact carries the wallet source commit, `native/Cargo.lock`, the ZIP's ch
 
 Removed with the patch mechanism: the repackage workflow and `scripts/restore-privacy-compiled.py`, which were pinned to a specific Privacy Testnet run and artifact and could not be reused here.
 
+## Theme
+
+The interface follows `Swarm Style Guide v2`. Every colour, radius and type role is a token in `src/components/common/Global.css`; the eight `--color-*` names the application has always used are kept and re-pointed at those tokens, so a screen picks the theme up without being restyled rule by rule.
+
+Two rules from the guide are load-bearing rather than decorative:
+
+- **Hive Orange `#FF8A1F` is the brand and the shielded state.** They are the same colour on purpose.
+- **Clear Blue `#6FB6FF` appears only where privacy is off** — a transparent address, a revealed amount, a button that puts something on-chain in the open. Nothing else may use it. The send confirmation is the first place it lands: when the wallet's own privacy verdict is anything but `Private`, the confirm button becomes a Clear Blue outline reading "Send anyway" and a line above it says what will be visible. The verdict and the transaction itself are unchanged; what changed is that a revealing send cannot be confirmed by reflex.
+
+Motion is decoration and a `prefers-reduced-motion` preference switches all of it off.
+
+Not yet done, and deliberately not faked:
+
+- **Fonts.** Sora, Manrope and JetBrains Mono are named first in `--font-display`, `--font-text` and `--font-mono` and are never fetched from the network. The files are not in the repository yet; see `src/assets/fonts/README.md`. Until they are, the fallbacks render and the type *roles* still hold.
+- **A COINBASE state pill.** Nothing in this wallet reports whether an output is a maturing coinbase, so there is no pill for it.
+- **Hiding balances.** `maskAmount` implements the guide's masking (`⬢⬢⬢⬢.⬢⬢ SWM`) and is tested, but no control switches it on yet.
+
+The pills say the wallet's own verdicts — `Private`, `Amount Revealed`, `Deshielded` — rather than the mockup's `SHIELDED` / `REVEALED`. Those verdicts are real, computed from the pools a transaction draws on and the kind of address it pays, and they are more specific than the mockup's labels; the pill's shape and its colour carry the state.
+
 ## Icon
 
 The mark is the style guide's hive bee (`Swarm Style Guide v2`, section 02): a Hive Orange hexagonal body with two stripes that take the background colour, and two honey wings. `scripts/make-swarm-icon.js` renders it — the guide's geometry unchanged — into `resources/swarm/icon.png`, `resources/swarm/icon.ico` and `src/assets/img/swarm-mark.png`. Those three files are the only artwork the wallet ships; changing the mark means re-running that script.

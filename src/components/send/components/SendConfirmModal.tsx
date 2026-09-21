@@ -17,6 +17,7 @@ import { usePaneOffset } from "../../scrollPane/usePaneOffset";
 import { useCopy } from "../../common/useCopy";
 import { isSameZnsAlias } from "../../../utils/zns";
 import { Field, FieldRow } from "../../common/DetailField";
+import PrivacyPill, { SHIELDED } from "../../common/PrivacyPill";
 import { BalanceBlockHighlight } from "../../balanceBlock";
 import routes from "../../../constants/routes.json";
 import getSendManyJSON from "./getSendManyJSON";
@@ -155,7 +156,7 @@ const RecipientSummary: React.FC<RecipientSummaryProps> = ({ toaddr, privacyLeve
           </div>
         )}
 
-        <Field label="Privacy" value={privacyLevel} />
+        <Field label="Privacy" value={<PrivacyPill level={privacyLevel} />} />
 
         {/* The amount carries its fiat value underneath, the way the detail
             states it. The price is the one in context — this send has not
@@ -526,6 +527,15 @@ const SendConfirmModal: React.FC<SendConfirmModalProps> = ({
     }, 10);
   };
 
+  // The transaction's own verdict: one recipient's, or the weakest of a
+  // batch's. Empty until every recipient has been assessed, and `-` when the
+  // wallet could not reach a verdict at all — neither of which is a claim that
+  // the send is private, and neither of which is a claim that it is not.
+  const overallPrivacy: string =
+    privacyLevels.length === recipients.length && recipients.length > 0 ? worstPrivacyLevel(privacyLevels) : "";
+  const privacyKnown: boolean = overallPrivacy !== "" && overallPrivacy !== "-";
+  const sendingPrivately: boolean = !privacyKnown || overallPrivacy === SHIELDED;
+
   return (
     <Modal
       isOpen={modalIsOpen}
@@ -599,18 +609,48 @@ const SendConfirmModal: React.FC<SendConfirmModalProps> = ({
             {!single && (
               <Field
                 label="Transaction Privacy"
-                value={privacyLevels.length === recipients.length ? worstPrivacyLevel(privacyLevels) : "…"}
+                value={<PrivacyPill level={privacyLevels.length === recipients.length ? worstPrivacyLevel(privacyLevels) : "…"} />}
               />
             )}
           </FieldRow>
         </div>
 
+        {/*
+            An action that reduces privacy never wears the orange primary.
+            The verdict is the wallet's own — computed above from the pools
+            this transaction draws on and the kind of address it pays — and
+            when it is anything but Private the confirmation says what will be
+            visible and the button becomes the Clear Blue outline. Nothing
+            about how the transaction is built changes; what changes is that
+            it cannot be sent by reflex.
+        */}
+        {!sendingPrivately && (
+          <div
+            className={cstyles.sublight}
+            style={{
+              margin: "0 10px 10px",
+              padding: "12px 14px",
+              borderRadius: "var(--radius-m)",
+              border: "1px solid var(--swarm-clear-blue-edge)",
+              background: "var(--swarm-clear-blue-wash)",
+              color: "var(--swarm-clear-blue)",
+            }}
+          >
+            This transaction will not be fully shielded: {overallPrivacy.toLowerCase()}. What it reveals stays on the
+            chain for good.
+          </div>
+        )}
+
         <div className={cstyles.buttoncontainer} ref={footerRef}>
-          <button type="button" className={cstyles.primarybutton} onClick={closeModal}>
+          <button type="button" className={cstyles.secondarybutton} onClick={closeModal}>
             Cancel
           </button>
-          <button type="button" className={cstyles.primarybutton} onClick={() => sendButton()}>
-            Send
+          <button
+            type="button"
+            className={sendingPrivately ? cstyles.primarybutton : cstyles.revealbutton}
+            onClick={() => sendButton()}
+          >
+            {!privacyKnown ? "Send" : sendingPrivately ? "Send shielded" : "Send anyway"}
           </button>
         </div>
       </div>
