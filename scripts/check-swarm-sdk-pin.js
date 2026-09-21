@@ -25,11 +25,18 @@ const { execFileSync } = require("child_process");
 
 const root = path.resolve(__dirname, "..");
 const argv = process.argv.slice(2);
-const flags = argv.filter((argument) => argument.startsWith("--"));
-const positional = argv.filter((argument, index) => !argument.startsWith("--") && !argv[index - 1]?.startsWith("--manifest"));
+const manifestAt = argv.indexOf("--manifest");
+// `indexOf` answers -1 when the flag is absent, and `argv[-1 + 1]` is the
+// first positional argument — which would silently make the SDK checkout path
+// the manifest path. The workflow passes no `--manifest`, so that mistake
+// would have failed every CI build with a JSON parse error on a directory.
+const manifestPath = manifestAt === -1 ? undefined : argv[manifestAt + 1];
+if (manifestAt !== -1 && !manifestPath) throw new Error("--manifest needs a path");
+const positional = argv.filter(
+  (argument, index) => !argument.startsWith("--") && index !== manifestAt + 1,
+);
 const [sdkPath = path.join(root, "sdk-source")] = positional;
-const requireRealGenesis = flags.includes("--require-real-genesis");
-const manifestPath = argv[argv.indexOf("--manifest") + 1];
+const requireRealGenesis = argv.includes("--require-real-genesis");
 
 const pin = JSON.parse(fs.readFileSync(path.join(root, "sdk/swarm-sdk-pin.json"), "utf8"));
 const fail = (message) => {
@@ -39,24 +46,43 @@ const fail = (message) => {
 if (!/^[0-9a-f]{40}$/.test(pin.commit)) fail("The SDK pin does not name an exact revision.");
 
 // 0. The network's own definition, when it is reachable. The manifest is the
-//    authority: the pin's copy of it must agree, field for field.
+//    authority, and the pin carries a copy of it; this is where the copy is
+//    checked rather than trusted.
+//
+//    Only the fields that decide which chain a wallet is talking to are
+//    enforced. The manifest is still being finished — the reproduction count
+//    rises, an operations section arrives, configs are re-rendered — and a
+//    wallet build has no business failing over bookkeeping it does not read.
+//    Those fields are recorded for provenance and reported when they drift,
+//    not treated as a mismatch.
 if (manifestPath) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  const expected = {
+  const decidesTheChain = {
     networkName: manifest.identity?.network_name,
     lightWalletChainLabel: manifest.identity?.light_wallet_chain_label,
     genesisHash: manifest.genesis?.hash,
     genesisBlockSha256: manifest.genesis?.block_sha256,
     lightWalletGrpcPort: manifest.ports?.lightwallet_grpc,
+  };
+  const bookkeeping = {
     generatorCommit: manifest.genesis?.generator?.commit,
     reproductions: manifest.genesis?.generator?.reproductions,
   };
-  for (const [field, value] of Object.entries(expected)) {
+  for (const [field, value] of Object.entries(decidesTheChain)) {
     if (value === undefined) fail(`The network manifest does not state ${field}.`);
     if (pin.manifest?.[field] !== value) {
       fail(`The pin says ${field}=${JSON.stringify(pin.manifest?.[field])}, the manifest says ${JSON.stringify(value)}.`);
     }
   }
+  for (const [field, value] of Object.entries(bookkeeping)) {
+    if (value !== undefined && pin.manifest?.[field] !== value) {
+      console.log(
+        `Note: the manifest's ${field} has moved to ${JSON.stringify(value)} since this pin recorded ` +
+          `${JSON.stringify(pin.manifest?.[field])}. It does not change which chain this build talks to.`,
+      );
+    }
+  }
+  const expected = decidesTheChain;
   if (pin.genesis !== expected.genesisHash) fail("The pinned genesis is not the manifest's genesis.");
   if (pin.chainName !== expected.lightWalletChainLabel) fail("The pinned chain label is not the manifest's.");
 

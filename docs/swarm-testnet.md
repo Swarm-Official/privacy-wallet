@@ -2,13 +2,15 @@
 
 This fork keeps Zingo PC's desktop application and Zingolib's wallet and cryptographic implementation unchanged. What it adds is a network profile: `swarm-testnet`, the SwarmTestnet chain, which uses standard Zcash testnet address encodings and an explicitly pinned genesis. It is not the public Zcash testnet, and its coins — shown as `SWM` — have no market value and no fiat price.
 
-## The genesis hash does not exist yet
+## Which network this build talks to, and how it proves it
 
-SwarmTestnet's genesis block has not been generated. The pinned SDK therefore carries `SWARM_TESTNET_GENESIS_PLACEHOLDER` (the ASCII text `SWARMTESTNETGENESISPLACEHOLDER!!` in hex), which no block can hash to. Every build made before the real hash lands is a development build and will refuse to talk to any indexer.
+The genesis hash lives in one constant in the pinned SDK. `sdk/swarm-sdk-pin.json` records which SDK revision this repository compiles, which genesis that revision targets, and a copy of the fields of `network/swarm-testnet/manifest.json` that decide which chain a wallet is on.
 
-`sdk/swarm-sdk-pin.json` records which SDK revision this repository compiles and which genesis that revision targets. `scripts/check-swarm-sdk-pin.js` reads the pinned SDK's own `config.rs` and refuses the build if the two disagree. Passing `--require-real-genesis` — which the workflow does when its `release` input is set — refuses any build that still carries the placeholder.
+`scripts/check-swarm-sdk-pin.js` runs before anything is compiled and refuses the build unless the manifest declaration, `native/Cargo.toml`, `native/Cargo.lock`, the checked-out SDK revision and that SDK's own `config.rs` all name the same network and the same genesis. It enforces the network name, the chain label, the genesis hash, the genesis block's SHA-256 and the light-wallet gRPC port; it reports, without failing, when the generator's own bookkeeping (its commit, its reproduction count) has moved on, because none of that changes which chain the build talks to.
 
-When the hash arrives: set `SWARM_TESTNET_GENESIS` in the SDK, push that SDK commit, update the `rev` in `native/Cargo.toml`, the seven `source =` lines in `native/Cargo.lock`, the `ref:` in the workflow and `sdk/swarm-sdk-pin.json`. Nothing else holds the hash.
+Two gates sit on top of it. `--require-real-genesis`, which the workflow passes when its `release` input is set, refuses a build still carrying `SWARM_TESTNET_GENESIS_PLACEHOLDER`. And `--manifest <path>`, given the network's own definition, refuses a genesis **stamped in the future**: the chain produces no block 1 until that moment arrives, so a wallet pinned to it would sync nothing while reporting nothing wrong. The first generated genesis had that fault — seven hours ahead — and this check is what caught it before an hour of compilation was spent on it.
+
+Re-pointing at a new genesis means: set `SWARM_TESTNET_GENESIS` in the SDK, push that commit, then update the `rev` in `native/Cargo.toml`, the seven `source =` lines in `native/Cargo.lock`, the `ref:` in the workflow and `sdk/swarm-sdk-pin.json`. Nothing else holds the hash.
 
 ## Servers
 
