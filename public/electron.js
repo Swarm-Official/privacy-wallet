@@ -48,11 +48,26 @@ const { isOpenablePaymentUri } = require("./paymentUri");
 
 const STORAGE_KEY = "wallets";
 const isDev = !app.isPackaged;
-const isPrivacyTestnetBuild = require(path.join(app.getAppPath(), "package.json")).name === "privacy-wallet-testnet";
-if (isPrivacyTestnetBuild && !settings.getSync("all")) {
+const isSwarmWalletBuild = require(path.join(app.getAppPath(), "package.json")).name === "swarm-wallet-testnet";
+
+// What the window is called on this build. The renderer's document title says
+// "Zingo PC", which is upstream's and is not this application's name, so the
+// window carries its own and `page-title-updated` is refused below.
+const SWARM_WINDOW_TITLE = "SWARM Wallet (Testnet)";
+
+// The chain and the server a fresh profile starts on. Two facts about this
+// network drive it: its indexer reports the label `swarm-testnet`, and the
+// public lightwalletd registry has nothing for it — so "Automatic" cannot
+// resolve a server here and the selection is `custom` from the first launch.
+// Mirrors src/utils/swarmNetwork.ts, which the renderer reads; this copy
+// exists because the main process runs before any renderer module is loaded.
+const SWARM_CHAIN_NAME = "swarm-testnet";
+const SWARM_DEFAULT_SERVER = "https://lwd.swarm.green:443";
+
+if (isSwarmWalletBuild && !settings.getSync("all")) {
   settings.setSync("all", {
-    serveruri: "http://127.0.0.1:19767",
-    serverchain_name: "privacy-testnet",
+    serveruri: SWARM_DEFAULT_SERVER,
+    serverchain_name: SWARM_CHAIN_NAME,
     serverselection: "custom",
     currentwalletid: null,
   });
@@ -784,7 +799,7 @@ ipcMain.handle("auth:verify", async (_e, reason) => {
 // ── Keychain-backed requireDeviceAuth ─────────────────────────────────────
 // Missing or deleted entry is treated as true (auth required by default).
 // Only an explicit "false" stored by the user disables the feature.
-const KEYTAR_SERVICE = isPrivacyTestnetBuild ? "Privacy Wallet Testnet" : "Zingo PC";
+const KEYTAR_SERVICE = isSwarmWalletBuild ? "SWARM Wallet (Testnet)" : "Zingo PC";
 const KEYTAR_ACCOUNT = "requireDeviceAuth";
 
 // In-process cache of the value so we only hit Keychain ONCE per session.
@@ -868,7 +883,7 @@ const serverRegistry = createServerRegistry({
 });
 
 ipcMain.handle("servers:fetchList", async (_e, chain) => {
-  if (chain === "privacy-testnet" || settings.getSync("all.serverchain_name") === "privacy-testnet") {
+  if (chain === SWARM_CHAIN_NAME || settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
     return { ok: true, servers: [] };
   }
   const servers = await serverRegistry.load(chain);
@@ -1605,7 +1620,7 @@ async function attachCurrentWallet() {
 }
 
 function spawnProxy() {
-  if (settings.getSync("all.serverchain_name") === "privacy-testnet") {
+  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
     setMixnetPhase("switched_off");
     return;
   }
@@ -1735,8 +1750,8 @@ ipcMain.handle("mixnet:get-status", async () => {
   return snapshot;
 });
 ipcMain.handle("mixnet:enable", async () => {
-  if (settings.getSync("all.serverchain_name") === "privacy-testnet") {
-    throw new Error("Privacy Testnet uses your configured node connection. Mixnet support for this network is pending.");
+  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
+    throw new Error("SWARM Testnet uses your configured node connection. Mixnet support for this network is pending.");
   }
   mixnet.intent = "on";
   // Attaching again to a transport the wallet has given up on is the same
@@ -1763,7 +1778,7 @@ ipcMain.handle("mixnet:disable", async () => {
 // Called by the renderer on every wallet load: bring the new client onto the
 // session tunnel (or record the opt-out) without re-bootstrapping.
 ipcMain.handle("mixnet:attach-current", async () => {
-  if (settings.getSync("all.serverchain_name") === "privacy-testnet") {
+  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
     cancelMixnetReconnect();
     killProxy();
     await requireNative("stop_mixnet").stop_mixnet();
@@ -1800,7 +1815,7 @@ const MIXNET_STALE_AFTER_MS = 5 * 60 * 1000;
 let mixnetBlurredAt = null;
 
 function restartMixnet(reason) {
-  if (settings.getSync("all.serverchain_name") === "privacy-testnet") return;
+  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) return;
   if (mixnet.intent !== "on") return; // deliberately off: leave it off
   console.log(`[mixnet] restarting after ${reason}`);
   killProxy();
@@ -2447,6 +2462,7 @@ function createWindow() {
     minHeight: 600,
     maxWidth: 1500,
     maxHeight: 800,
+    ...(isSwarmWalletBuild ? { title: SWARM_WINDOW_TITLE } : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -2477,6 +2493,16 @@ function createWindow() {
 
   const ignore = process.platform !== "darwin";
   mainWindow.webContents.setIgnoreMenuShortcuts(ignore);
+
+  // The bundled page still carries upstream's <title>, and Electron adopts a
+  // document title over the window's own as soon as the page loads. Refused
+  // here so this build's window keeps the application's name.
+  if (isSwarmWalletBuild) {
+    mainWindow.on("page-title-updated", (event) => {
+      event.preventDefault();
+      mainWindow.setTitle(SWARM_WINDOW_TITLE);
+    });
+  }
 
   // Block new windows — open https:// URLs in the system browser instead.
   // Prevents a compromised renderer from spawning a window that inherits the preload.
@@ -2873,7 +2899,7 @@ app.whenReady().then(async () => {
   // - Windows/Linux packaged: the installer registers it, but calling this too doesn't hurt.
   // - Dev mode on any platform: needed because electron-builder hasn't run.
   const isInSandbox = process.mas || !!process.env.FLATPAK_ID;
-  if (!isInSandbox && !isPrivacyTestnetBuild) {
+  if (!isInSandbox && !isSwarmWalletBuild) {
     if (process.defaultApp) {
       // Dev mode on Windows/Linux: register so URIs reach this instance via second-instance.
       // Skipped on macOS: cold-start doesn't work in dev anyway, and registering here would
@@ -2904,7 +2930,7 @@ app.whenReady().then(async () => {
   // LoadingScreen asks, the request has usually already landed, so `auto` costs
   // the launch nothing. Testnet is fetched on demand — far rarer, and no reason
   // to spend a second clearnet request on every launch.
-  if (settings.getSync("all.serverchain_name") !== "privacy-testnet") {
+  if (settings.getSync("all.serverchain_name") !== SWARM_CHAIN_NAME) {
     serverRegistry.load("main");
   }
 

@@ -15,6 +15,15 @@ import serverUrisList from "../../utils/serverUrisList";
 import fetchServerList from "../../utils/fetchServerList";
 import selectFastestServer, { RACE_CANDIDATES } from "../../utils/selectFastestServer";
 import Utils from "../../utils/utils";
+import {
+  SWARM_ACTIVATION_HEIGHT,
+  SWARM_DEFAULT_SERVER,
+  SWARM_NO_AUTOMATIC_REASON,
+  SWARM_SERVER_PRESETS,
+  isSwarmChain,
+  swarmPresetFor,
+  swarmUnreachableMessage,
+} from "../../utils/swarmNetwork";
 import { native, ipcRenderer } from "../../electronBridge";
 import { useLocation } from "react-router-dom";
 import ScrollPaneTop from "../scrollPane/ScrollPane";
@@ -117,7 +126,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
     main: 419200,
     test: 280000,
     regtest: 1,
-    "privacy-testnet": 1,
+    "swarm-testnet": SWARM_ACTIVATION_HEIGHT,
     "": 1,
   };
 
@@ -150,8 +159,35 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
   // In settings the wallet already has a server for its chain and the chain
   // cannot change, so the existing one stands until the next launch re-picks.
   // Creating is the case that has to resolve now.
+  // The project chain's server, chosen here rather than left to be picked.
+  //
+  // Defect W-1: on this chain "Automatic" cannot work and never could. It
+  // resolves through the public lightwalletd registry, which answers an empty
+  // list for SwarmTestnet by design, so the radio the screen opened on led
+  // straight to "No server could be reached for swarm-testnet". Until now the
+  // project endpoint was only ever filled in by the Network dropdown's
+  // onChange — a user who arrived with the chain already selected, which is
+  // every user on a fresh profile, never passed through it.
+  //
+  // So the chain picks `custom` with an endpoint in the box, at mount and on
+  // every change, in all four creation types and in the settings screen, and
+  // "Automatic" is not offered at all (see `SWARM_NO_AUTOMATIC_REASON`).
+  const chooseSwarmServer = useCallback((uri: string) => {
+    setSelectedSelection(ServerSelectionEnum.custom);
+    setCustomServer(uri);
+    setSelectedServer(uri);
+    setListServer("");
+  }, []);
+
   const chooseAutomaticFor = useCallback(
     async (chain: ServerChainNameEnum) => {
+      // Belt and braces: the radio is not rendered for this chain, so nothing
+      // should reach here — and if a later change does, it lands on the
+      // project endpoint instead of on the "no server could be reached" modal.
+      if (isSwarmChain(chain)) {
+        chooseSwarmServer(customServer || SWARM_DEFAULT_SERVER);
+        return;
+      }
       setSelectedSelection(ServerSelectionEnum.auto);
       if (mode !== "addnew") {
         setSelectedServer(autoServer);
@@ -178,17 +214,21 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
         setAutoResolving(false);
       }
     },
-    [mode, autoServer, resolveAutoServer, openErrorModal],
+    [mode, autoServer, resolveAutoServer, openErrorModal, chooseSwarmServer, customServer],
   );
 
   const chooseAutomatic = useCallback(() => {
+    if (isSwarmChain(selectedChain)) {
+      chooseSwarmServer(customServer || SWARM_DEFAULT_SERVER);
+      return;
+    }
     if (mode !== "addnew") {
       void chooseAutomaticFor(ServerChainNameEnum.mainChainName);
       return;
     }
     if (!selectedChain) return;
     void chooseAutomaticFor(selectedChain);
-  }, [mode, selectedChain, chooseAutomaticFor]);
+  }, [mode, selectedChain, chooseAutomaticFor, chooseSwarmServer, customServer]);
 
   const initialServerValue = useCallback(
     (server: string, _chain_name: ServerChainNameEnum | "", selection: ServerSelectionEnum | "") => {
@@ -228,10 +268,23 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       const safeChain = currChain || "";
       const safeServer = currServer || "";
       const safeSelection = currSelection || "";
-      initialServerValue(safeServer, safeChain, safeSelection as ServerSelectionEnum | "");
-      setSelectedServer(safeServer);
       setSelectedChain(safeChain);
-      setSelectedSelection(safeSelection as ServerSelectionEnum | "");
+      if (isSwarmChain(safeChain)) {
+        // W-1, the mount half. Whatever the stored selection says — auto,
+        // list, or nothing at all on a profile that has never saved one — the
+        // project chain opens on `custom` with an endpoint already in the box.
+        // A stored URI is the user's own and is kept; otherwise the default
+        // preset. Applies in every mode, so "change server" from the settings
+        // screen lands the same way.
+        const storedIsForThisChain =
+          !!safeServer && (!!swarmPresetFor(safeServer) || safeSelection === ServerSelectionEnum.custom);
+        setAutoServer("");
+        chooseSwarmServer(storedIsForThisChain ? safeServer : SWARM_DEFAULT_SERVER);
+      } else {
+        initialServerValue(safeServer, safeChain, safeSelection as ServerSelectionEnum | "");
+        setSelectedServer(safeServer);
+        setSelectedSelection(safeSelection as ServerSelectionEnum | "");
+      }
       if (mode !== "addnew" && !!currentWallet) {
         // settings / delete: pre-fill with current wallet's data
         setAlias(currentWallet.alias);
@@ -252,6 +305,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
     })();
   }, [
     initialServerValue,
+    chooseSwarmServer,
     currentWallet?.chain_name,
     currentWallet?.selection,
     currentWallet?.uri,
@@ -563,7 +617,12 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
           } as ServerClass,
         ]);
         if (!serverFaster) {
-          openErrorModal("Save Wallet Settings", "This server is not working properly, choose another one.");
+          openErrorModal(
+            "Save Wallet Settings",
+            isSwarmChain(selectedChain)
+              ? swarmUnreachableMessage(selectedServer)
+              : "This server is not working properly, choose another one.",
+          );
           return;
         }
       }
@@ -775,6 +834,28 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       }
     }
 
+    // The project chain's server is asked whether it is there before a wallet
+    // is built against it. The default one is not deployed yet, so without
+    // this the first Create on a fresh install ends in a transport error that
+    // names nothing the user can act on.
+    if (mode === "addnew" && isSwarmChain(selectedChain)) {
+      const answered = await selectFastestServer([
+        {
+          uri: selectedServer,
+          chain_name: selectedChain,
+          latency: null,
+          default: false,
+          obsolete: false,
+        } as ServerClass,
+      ]);
+      if (!answered) {
+        openErrorModal(title, swarmUnreachableMessage(selectedServer));
+        setServerExpanded(true);
+        isSubmittingRef.current = false;
+        return;
+      }
+    }
+
     if (mode === "addnew") {
       // check the fields — surface WHY nothing happened instead of returning
       // silently (users saw the Create button do nothing with no message).
@@ -943,11 +1024,10 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                   setServerExpanded(true);
                   const chain = e.target.value as ServerChainNameEnum | "";
                   setSelectedChain(chain);
-                  if (chain === ServerChainNameEnum.privacyTestnetChainName) {
-                    const endpoint = "http://127.0.0.1:19767";
-                    setSelectedSelection(ServerSelectionEnum.custom);
-                    setCustomServer(endpoint);
-                    setSelectedServer(endpoint);
+                  if (isSwarmChain(chain)) {
+                    // W-1, the change half: the same landing as at mount.
+                    setAutoServer("");
+                    chooseSwarmServer(swarmPresetFor(customServer) ? customServer : SWARM_DEFAULT_SERVER);
                     return;
                   }
                   // Automatic is a choice about how to pick, not about which
@@ -984,7 +1064,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                 <option value="main">{Utils.chainDisplayName(ServerChainNameEnum.mainChainName)}</option>
                 <option value="test">{Utils.chainDisplayName(ServerChainNameEnum.testChainName)}</option>
                 <option value="regtest">{Utils.chainDisplayName(ServerChainNameEnum.regtestChainName)}</option>
-                <option value="privacy-testnet">{Utils.chainDisplayName(ServerChainNameEnum.privacyTestnetChainName)}</option>
+                <option value="swarm-testnet">{Utils.chainDisplayName(ServerChainNameEnum.swarmTestnetChainName)}</option>
               </select>
             </div>
           </div>
@@ -1157,22 +1237,53 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                         <FontAwesomeIcon icon={faChevronUp} />
                       </div>
                     </div>
-                    <div className={cstyles.horizontalflex} style={{ margin: "5px 10px", alignItems: "center" }}>
-                      <input
-                        checked={selectedSelection === ServerSelectionEnum.auto}
-                        style={{ accentColor: "var(--color-primary)" }}
-                        type="radio"
-                        name="selection"
-                        aria-label="Automatic"
-                        value={ServerSelectionEnum.auto}
-                        disabled={autoResolving}
-                        onClick={() => chooseAutomatic()}
-                        onChange={() => chooseAutomatic()}
-                      />
-                      Automatic
-                      {autoResolving && <span className={cstyles.sublight}>&nbsp; finding a server…</span>}
-                    </div>
-                    {servers.filter((s) => s.chain_name === selectedChain).length > 0 && (
+                    {isSwarmChain(selectedChain) ? (
+                      // No "Automatic" here, and a sentence in its place so the
+                      // absence reads as a decision. The radio resolved through
+                      // the public registry, which has nothing for this chain.
+                      <div className={cstyles.sublight} style={{ margin: "5px 10px" }} role="note">
+                        {SWARM_NO_AUTOMATIC_REASON}
+                      </div>
+                    ) : (
+                      <div className={cstyles.horizontalflex} style={{ margin: "5px 10px", alignItems: "center" }}>
+                        <input
+                          checked={selectedSelection === ServerSelectionEnum.auto}
+                          style={{ accentColor: "var(--color-primary)" }}
+                          type="radio"
+                          name="selection"
+                          aria-label="Automatic"
+                          value={ServerSelectionEnum.auto}
+                          disabled={autoResolving}
+                          onClick={() => chooseAutomatic()}
+                          onChange={() => chooseAutomatic()}
+                        />
+                        Automatic
+                        {autoResolving && <span className={cstyles.sublight}>&nbsp; finding a server…</span>}
+                      </div>
+                    )}
+                    {isSwarmChain(selectedChain) && (
+                      <div className={cstyles.horizontalflex} style={{ margin: "5px 10px", alignItems: "center" }}>
+                        <div className={cstyles.sublight} style={{ marginRight: "20px" }}>
+                          Server
+                        </div>
+                        <select
+                          aria-label="SWARM server"
+                          className={cstyles.fieldselect}
+                          value={swarmPresetFor(customServer) ? customServer : ""}
+                          onChange={(e) => {
+                            if (e.target.value) chooseSwarmServer(e.target.value);
+                          }}
+                        >
+                          {SWARM_SERVER_PRESETS.map((preset) => (
+                            <option key={preset.uri} value={preset.uri}>
+                              {`${preset.label} — ${preset.uri}`}
+                            </option>
+                          ))}
+                          <option value="">Another server (type it below)</option>
+                        </select>
+                      </div>
+                    )}
+                    {!isSwarmChain(selectedChain) && servers.filter((s) => s.chain_name === selectedChain).length > 0 && (
                       <div className={cstyles.horizontalflex} style={{ margin: "5px 10px", alignItems: "center" }}>
                         <input
                           checked={selectedSelection === ServerSelectionEnum.list}
@@ -1221,23 +1332,38 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                       </div>
                     )}
                     <div style={{ margin: "5px 10px" }}>
-                      <input
-                        checked={selectedSelection === "custom"}
-                        style={{ accentColor: "var(--color-primary)" }}
-                        type="radio"
-                        name="selection"
-                        aria-label="Custom"
-                        value={"custom"}
-                        onClick={() => {
-                          setSelectedSelection(ServerSelectionEnum.custom);
-                          setSelectedServer(customServer);
-                        }}
-                        onChange={() => {
-                          setSelectedSelection(ServerSelectionEnum.custom);
-                          setSelectedServer(customServer);
-                        }}
-                      />
-                      Custom
+                      {isSwarmChain(selectedChain) ? (
+                        // One radio on its own would be a control with nothing
+                        // to choose between. The field is the choice here.
+                        <>
+                          Server address
+                          {swarmPresetFor(customServer) && (
+                            <span className={cstyles.sublight}>
+                              &nbsp;— {swarmPresetFor(customServer)?.note}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            checked={selectedSelection === "custom"}
+                            style={{ accentColor: "var(--color-primary)" }}
+                            type="radio"
+                            name="selection"
+                            aria-label="Custom"
+                            value={"custom"}
+                            onClick={() => {
+                              setSelectedSelection(ServerSelectionEnum.custom);
+                              setSelectedServer(customServer);
+                            }}
+                            onChange={() => {
+                              setSelectedSelection(ServerSelectionEnum.custom);
+                              setSelectedServer(customServer);
+                            }}
+                          />
+                          Custom
+                        </>
+                      )}
                       <div className={`${cstyles.well} ${cstyles.horizontalflex}`}>
                         <div style={{ width: "75%", padding: 0, margin: 0, flexWrap: "nowrap" }}>
                           <div className={cstyles.fieldrow} style={{ width: "100%" }}>

@@ -2,13 +2,14 @@ import React from "react";
 import { render, screen } from "../../test-utils";
 import Logo from "./Logo";
 import APP_VERSION from "../../version";
+import { SWARM_APP_NAME } from "../../utils/swarmNetwork";
 
 jest.mock("../../electronBridge");
 
 describe("Logo", () => {
   it("always shows the version string", () => {
     render(<Logo onlyVersion={false} readOnly={false} />);
-    expect(screen.getByText(`Zingo PC v${APP_VERSION}`)).toBeInTheDocument();
+    expect(screen.getByText(`${SWARM_APP_NAME} v${APP_VERSION}`)).toBeInTheDocument();
   });
 
   it("shows the logo image when onlyVersion is false", () => {

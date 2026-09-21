@@ -1,4 +1,5 @@
 import React from "react";
+import { SWARM_APP_NAME } from "../../utils/swarmNetwork";
 import { act, cleanup, screen } from "@testing-library/react";
 import { render } from "../../test-utils";
 import { InfoClass, ServerChainNameEnum } from "../appstate";
@@ -158,7 +159,7 @@ describe("Sidebar", () => {
       const openErrorModal = jest.fn();
       renderSidebar({ openErrorModal });
       act(() => getListener("about")?.({}));
-      expect(openErrorModal).toHaveBeenCalledWith("Zingo PC", expect.anything());
+      expect(openErrorModal).toHaveBeenCalledWith(SWARM_APP_NAME, expect.anything());
     });
 
     it("'payuri' with empty uri opens the PayURI modal", () => {

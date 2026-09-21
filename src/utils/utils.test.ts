@@ -17,14 +17,14 @@ beforeEach(() => {
 });
 
 test("custom testnet uses test addresses while rejecting mainnet and regtest encodings", () => {
-  const project = ServerChainNameEnum.privacyTestnetChainName;
+  const project = ServerChainNameEnum.swarmTestnetChainName;
   expect(Utils.sameAddressNetwork(ServerChainNameEnum.testChainName, project)).toBe(true);
   expect(Utils.sameAddressNetwork(ServerChainNameEnum.mainChainName, project)).toBe(false);
   expect(Utils.sameAddressNetwork(ServerChainNameEnum.regtestChainName, project)).toBe(false);
 });
 
 test("custom testnet does not send transaction or address identifiers to public explorers", () => {
-  const project = ServerChainNameEnum.privacyTestnetChainName;
+  const project = ServerChainNameEnum.swarmTestnetChainName;
   expect(Utils.zecExplorerTxUrl("test-tx", project, BlockExplorerEnum.Zcashexplorer, "")).toBe("");
   Utils.openAddress("test-address", project, BlockExplorerEnum.Zcashexplorer, "");
   expect(mockOpenExternal).not.toHaveBeenCalled();

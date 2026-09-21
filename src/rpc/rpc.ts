@@ -22,6 +22,7 @@ import { RPCIronwoodDrainType } from "./components/RPCIronwoodDrainType";
 import { RPCMixnetStatusType } from "./components/RPCMixnetStatusType";
 import { deriveMixnetView, MixnetView, UNKNOWN_MIXNET_VIEW } from "./components/mixnetPresenter";
 import { userFacingError } from "../utils/userFacingError";
+import { SWARM_TICKER } from "../utils/swarmNetwork";
 import { depositSpendsSourceAddress } from "../swap/depositRouting";
 import { INITIAL_SERVER_HEALTH, ServerHealthState, recordProbe } from "./components/serverHealth";
 import {
@@ -412,7 +413,7 @@ export default class RPC {
       info.version = `${infoJSON.vendor}/${infoJSON.git_commit ? infoJSON.git_commit.substring(0, 6) : ""}/${infoJSON.version}`;
       info.zcashdVersion = "Not Available";
       info.currencyName = info.chainName === ServerChainNameEnum.mainChainName ? "ZEC" :
-        info.chainName === ServerChainNameEnum.privacyTestnetChainName ? "TEST" : "TAZ";
+        info.chainName === ServerChainNameEnum.swarmTestnetChainName ? SWARM_TICKER : "TAZ";
       info.solps = 0;
 
       // ZEC price lives outside InfoClass (see `getZecPrice` below) and is

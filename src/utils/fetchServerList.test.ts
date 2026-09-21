@@ -102,7 +102,7 @@ test("never asks the registry about regtest", async () => {
 
 test("keeps the project's testnet separate from the public server registry", async () => {
   respondWith([server("public-zcash.example")]);
-  expect(await fetchServerList(ServerChainNameEnum.privacyTestnetChainName)).toEqual([]);
+  expect(await fetchServerList(ServerChainNameEnum.swarmTestnetChainName)).toEqual([]);
   expect(invoke).not.toHaveBeenCalled();
 });
 

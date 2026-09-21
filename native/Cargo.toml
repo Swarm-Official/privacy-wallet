@@ -60,12 +60,15 @@ crate-type = ["cdylib"]
 #
 # Also gone: `PriceFetchRoute::Clearnet` and `LightClientError::ProbeRequiresMixnet`,
 # neither of which this crate named.
-# Privacy integration build: these paths are populated from the exact SDK base
-# and reviewed patch recorded in patches/privacy-sdk-v2.json. The workflow
-# verifies both before building. Full SDK release gates remain separate.
-zingolib = { features = ["nym", "perspective"], path = "../vendor/zingolib/zingolib", version = "6.0.0" }
-pepper-sync = { path = "../vendor/zingolib/pepper-sync", version = "0.5.0" }
-zingo-netutils = { path = "../vendor/zingolib/zingo-netutils", version = "5.0.1" }
+# SwarmTestnet build: the project's SDK fork, pinned by revision rather than
+# reconstructed from a patch snapshot. By rev and not by branch, so the build
+# stays reproducible (ADR 0024 rule 7); bump it deliberately. The same revision
+# is recorded in sdk/swarm-sdk-pin.json, and scripts/check-swarm-sdk-pin.js
+# checks this file, the lockfile and the pinned SDK's own genesis constant
+# against it before anything is compiled.
+zingolib = { features = ["nym", "perspective"], git = "https://github.com/brs-holding/privacy-zingolib", rev = "508136111b879fa5917ef25ae94784504eef3256" }
+pepper-sync = { git = "https://github.com/brs-holding/privacy-zingolib", rev = "508136111b879fa5917ef25ae94784504eef3256" }
+zingo-netutils = { git = "https://github.com/brs-holding/privacy-zingolib", rev = "508136111b879fa5917ef25ae94784504eef3256" }
 
 # These must match zingolib's workspace versions exactly, not merely be
 # semver-compatible with them. Two versions of `zcash_keys` resolve to two

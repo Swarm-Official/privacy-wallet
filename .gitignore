@@ -56,3 +56,8 @@ src/swap/swapKitSecrets.ts
 
 # The reproducible integration SDK checkout is populated by the build workflow.
 /vendor/zingolib/
+
+# Read-only checkout of the pinned SDK revision, and the record
+# scripts/check-swarm-sdk-pin.js writes from it. Both are build outputs.
+/sdk-source/
+/sdk-integration.json

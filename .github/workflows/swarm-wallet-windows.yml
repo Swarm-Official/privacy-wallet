@@ -1,7 +1,15 @@
-name: Privacy wallet Windows test build
+name: SWARM wallet Windows test build
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: >-
+          Refuse to build unless the pinned SDK carries a real SwarmTestnet
+          genesis hash. Leave this off while the network's genesis block does
+          not exist yet: every build until then is a development build.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -19,16 +27,18 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       RUSTUP_TOOLCHAIN: "1.96.0"
       RUSTFLAGS: '--cfg zcash_unstable="nu6.3"'
-      ZINGOLIB_PATH: ${{ github.workspace }}/vendor/zingolib
       CI: "true"
     steps:
       - uses: actions/checkout@v4
-      - name: Check out the SDK integration base
+      # Read-only, and only so the pin check can see which network the pinned
+      # SDK targets and so its licence ships with the binary. Cargo fetches its
+      # own copy of the same revision for the compile.
+      - name: Check out the pinned SDK revision
         uses: actions/checkout@v4
         with:
-          repository: zingolabs/zingolib
-          ref: 7a542ce4a6b14d83bd0108ff3e6c5d8d4c8c71a8
-          path: vendor/zingolib
+          repository: brs-holding/privacy-zingolib
+          ref: 508136111b879fa5917ef25ae94784504eef3256
+          path: sdk-source
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -42,8 +52,8 @@ jobs:
             ~/.cargo/git
             native/target
             vendor/zingolib/zingo-netutils/target
-          key: privacy-windows-rust196-nu63-${{ hashFiles('native/Cargo.lock', 'native/src/lib.rs', 'patches/privacy-sdk-v2.patch') }}
-          restore-keys: privacy-windows-rust196-nu63-
+          key: swarm-windows-rust196-nu63-${{ hashFiles('native/Cargo.lock', 'native/src/lib.rs', 'sdk/swarm-sdk-pin.json') }}
+          restore-keys: swarm-windows-rust196-nu63-
       - name: Install build prerequisites
         shell: pwsh
         run: |
@@ -54,15 +64,19 @@ jobs:
       - name: Install locked JavaScript dependencies
         run: yarn install --frozen-lockfile
       - name: Validate the complete Windows packaging configuration
-        run: node scripts/check-privacy-package-config.js
-      - name: Verify and apply the SDK integration snapshot
-        run: node scripts/prepare-privacy-sdk.js
+        run: node scripts/check-swarm-package-config.js
+      # Everything cheap that can refuse the build runs before the hour of
+      # compilation, not after it.
+      - name: Verify the pinned SDK revision and its network
+        run: node scripts/check-swarm-sdk-pin.js sdk-source ${{ inputs.release && '--require-real-genesis' || '' }}
+      - name: Check the lockfile resolves without changes
+        run: cargo fetch --locked --manifest-path native/Cargo.toml
       - name: Generate the empty optional swap configuration
         run: node scripts/generate-swapkit-secrets.js
       - name: Check the frontend types
         run: yarn tsc --noEmit
-      - name: Verify network and endpoint boundaries
-        run: node scripts/test.js --watchAll=false --runInBand src/utils/fetchServerList.test.ts src/utils/utils.test.ts src/components/dashboard/Dashboard.test.tsx src/components/send/Send.test.tsx
+      - name: Verify network, endpoint and server-selection boundaries
+        run: node scripts/test.js --watchAll=false --runInBand src/utils/fetchServerList.test.ts src/utils/utils.test.ts src/components/addNewWallet/AddNewWallet.test.tsx src/components/dashboard/Dashboard.test.tsx src/components/send/Send.test.tsx
       - name: Build the pinned wallet SDK adapter
         run: yarn neon-win-x64
       - name: Check Rust dependency pins
@@ -92,7 +106,7 @@ jobs:
       - name: Preserve compiled app inputs before packaging
         uses: actions/upload-artifact@v4
         with:
-          name: privacy-wallet-windows-compiled-inputs
+          name: swarm-wallet-windows-compiled-inputs
           path: |
             build/
             src/native.node
@@ -100,21 +114,22 @@ jobs:
             resources/vcruntime/
             node_modules/keytar/build/Release/keytar.node
             native/Cargo.lock
-            patches/privacy-sdk-v2.json
+            sdk/swarm-sdk-pin.json
+            sdk-integration.json
             compile-source-commit.txt
           retention-days: 7
       - name: Package the unsigned test wallet
-        run: yarn electron-builder --win zip --x64 --config configs/privacy-testnet-builder.cjs --publish never
+        run: yarn electron-builder --win zip --x64 --config configs/swarm-testnet-builder.cjs --publish never
       - name: Record build provenance and checksums
         shell: pwsh
         run: |
           git rev-parse HEAD | Set-Content dist/source-commit.txt
           Get-FileHash dist/*.zip -Algorithm SHA256 | Format-List | Out-File dist/SHA256SUMS.txt
           Copy-Item native/Cargo.lock dist/Cargo.lock
-          Copy-Item patches/privacy-sdk-v2.json dist/sdk-integration.json
+          Copy-Item sdk-integration.json dist/sdk-integration.json
       - uses: actions/upload-artifact@v4
         with:
-          name: privacy-wallet-windows-x64-unsigned-testnet
+          name: swarm-wallet-windows-x64-unsigned-testnet
           path: |
             dist/*.zip
             dist/SHA256SUMS.txt

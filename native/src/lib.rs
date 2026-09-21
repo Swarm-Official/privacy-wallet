@@ -552,7 +552,7 @@ fn construct_uri_load_config(
         "main" => ChainType::Mainnet,
         "test" => ChainType::Testnet,
         "regtest" => ChainType::Regtest(ActivationHeights::default()),
-        "privacy-testnet" => ChainType::CustomTestnet,
+        "swarm-testnet" => ChainType::CustomTestnet,
         _ => return Err(ZingolibError::Init("Not a valid chain hint!".to_string())),
     };
     let performancetype = match performance_level.as_str() {
@@ -566,13 +566,13 @@ fn construct_uri_load_config(
         match chaintype {
             ChainType::Testnet => { dir.push("testnet3"); dir }
             ChainType::Regtest(_) => { dir.push("regtest"); dir }
-            ChainType::CustomTestnet => { dir.push("privacy-testnet"); dir }
+            ChainType::CustomTestnet => { dir.push("swarm-testnet"); dir }
             ChainType::Mainnet => dir,
         }
     });
 
     let wallet_dir = if chaintype == ChainType::CustomTestnet {
-        std::env::var_os("PRIVACY_WALLET_DIR").map(std::path::PathBuf::from).or(wallet_dir)
+        std::env::var_os("SWARM_WALLET_DIR").map(std::path::PathBuf::from).or(wallet_dir)
     } else {
         wallet_dir
     };
@@ -1538,7 +1538,7 @@ fn parse_address(mut cx: FunctionContext) -> JsResult<JsPromise> {
                         ChainType::Mainnet => "main",
                         ChainType::Testnet => "test",
                         ChainType::Regtest(_) => "regtest",
-                        ChainType::CustomTestnet => "privacy-testnet",
+                        ChainType::CustomTestnet => "swarm-testnet",
                     };
                     match recipient_address {
                         Address::Sapling(_) => Ok(object! {

@@ -10,6 +10,7 @@ import randomColor from "randomcolor";
 
 import { native, shell } from "../electronBridge";
 import { ServerChainNameEnum } from "../components/appstate";
+import { SWARM_NETWORK_LABEL } from "./swarmNetwork";
 
 export const NO_CONNECTION: string = "Could not connect to the Server";
 
@@ -166,7 +167,7 @@ export default class Utils {
    */
   static sameAddressNetwork(encodedNetwork: string | undefined, selectedNetwork: string): boolean {
     return encodedNetwork === selectedNetwork ||
-      (selectedNetwork === ServerChainNameEnum.privacyTestnetChainName && encodedNetwork === ServerChainNameEnum.testChainName);
+      (selectedNetwork === ServerChainNameEnum.swarmTestnetChainName && encodedNetwork === ServerChainNameEnum.testChainName);
   }
 
   static chainDisplayName(chain: string | undefined): string {
@@ -177,8 +178,8 @@ export default class Utils {
         return "Testnet";
       case ServerChainNameEnum.regtestChainName:
         return "Regtest";
-      case ServerChainNameEnum.privacyTestnetChainName:
-        return "Privacy Testnet";
+      case ServerChainNameEnum.swarmTestnetChainName:
+        return SWARM_NETWORK_LABEL;
       default:
         return "";
     }
@@ -423,7 +424,7 @@ export default class Utils {
     blockExplorer: BlockExplorerEnum,
     blockExplorerCustom: string,
   ): string => {
-    if (chainName === ServerChainNameEnum.privacyTestnetChainName && blockExplorer !== BlockExplorerEnum.Custom) return "";
+    if (chainName === ServerChainNameEnum.swarmTestnetChainName && blockExplorer !== BlockExplorerEnum.Custom) return "";
     const testnet = chainName === ServerChainNameEnum.testChainName;
     if (blockExplorer === BlockExplorerEnum.Zcashexplorer) {
       return testnet
@@ -458,7 +459,7 @@ export default class Utils {
     blockExplorer: BlockExplorerEnum,
     blockExplorerCustom: string,
   ) => {
-    if (chainName === ServerChainNameEnum.privacyTestnetChainName && blockExplorer !== BlockExplorerEnum.Custom) return;
+    if (chainName === ServerChainNameEnum.swarmTestnetChainName && blockExplorer !== BlockExplorerEnum.Custom) return;
     if (blockExplorer === BlockExplorerEnum.Zcashexplorer) {
       if (chainName === ServerChainNameEnum.testChainName) {
         shell.openExternal(`https://testnet.zcashexplorer.app/search?qs=${address}`);

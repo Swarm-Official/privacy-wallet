@@ -7,6 +7,12 @@ import fetchServerList from "../../utils/fetchServerList";
 import { CreationTypeEnum, ServerChainNameEnum, ServerClass } from "../appstate";
 import { SwapStore, readCurrentWalletFingerprint } from "../../swap";
 import { useSwapService } from "../../context/ContextSwapService";
+import selectFastestServer from "../../utils/selectFastestServer";
+import {
+  SWARM_DEFAULT_SERVER,
+  SWARM_NO_AUTOMATIC_REASON,
+  SWARM_SERVER_PRESETS,
+} from "../../utils/swarmNetwork";
 
 jest.mock("../../electronBridge");
 jest.mock("../../utils/fetchServerList");
@@ -21,6 +27,13 @@ jest.mock("../../swap", () => ({
   swapRecordToValueTransfer: jest.fn(),
 }));
 jest.mock("../../context/ContextSwapService", () => ({ useSwapService: jest.fn() }));
+// Kept as a named factory so `RACE_CANDIDATES` survives: automocking it would
+// make the constant undefined, and `slice(0, undefined)` is an empty list.
+jest.mock("../../utils/selectFastestServer", () => ({
+  __esModule: true,
+  default: jest.fn(),
+  RACE_CANDIDATES: 3,
+}));
 
 const mockSettings = { serveruri: "", serverchain_name: "main", serverselection: "" };
 
@@ -34,8 +47,11 @@ const liveServer = (uri: string, chain = ServerChainNameEnum.mainChainName): Ser
   obsolete: false,
 });
 
+const probe = selectFastestServer as jest.MockedFunction<typeof selectFastestServer>;
+
 beforeEach(() => {
   (ipcRenderer.invoke as jest.Mock).mockResolvedValue(mockSettings);
+  probe.mockReset().mockImplementation(async (servers) => servers[0] ?? null);
   liveList.mockReset().mockResolvedValue([]);
   (useSwapService as jest.Mock).mockReturnValue(null);
   (SwapStore.clearForWallet as jest.Mock).mockResolvedValue(undefined);
@@ -184,6 +200,131 @@ describe("AddNewWallet automatic server", () => {
     });
 
     await waitFor(() => expect(liveList).toHaveBeenCalledWith(ServerChainNameEnum.testChainName));
+  });
+});
+
+// Defect W-1. On the project chain "Automatic" resolves through the public
+// lightwalletd registry, which answers nothing for it by design, so the radio
+// the screen used to open on led to "No server could be reached for
+// swarm-testnet". The project endpoint was only ever filled in by the Network
+// dropdown's onChange, which a fresh profile with the chain already stored
+// never passes through.
+describe("AddNewWallet on the project chain", () => {
+  const SWARM = ServerChainNameEnum.swarmTestnetChainName;
+  const OWN_NODE = SWARM_SERVER_PRESETS[1].uri;
+
+  /** A profile whose stored chain is the project's, as a fresh install has. */
+  const storedSettings = (overrides: Partial<typeof mockSettings> = {}) =>
+    (ipcRenderer.invoke as jest.Mock).mockResolvedValue({
+      serveruri: "",
+      serverchain_name: SWARM,
+      serverselection: "auto",
+      ...overrides,
+    });
+
+  const openServerBlock = async () => fireEvent.click((await screen.findAllByText("Selected Server"))[0]);
+
+  const mount = async (state?: { mode: string }) => {
+    render(<AddNewWallet {...baseProps} />, {
+      initialRoute: (state ? { pathname: "/addnewwallet", state } : "/addnewwallet") as never,
+      ...(state?.mode === "settings"
+        ? { contextOverrides: { currentWallet: { id: 4, alias: "Mine", fileName: "w.dat", chain_name: SWARM, uri: OWN_NODE, selection: "custom" } as never } }
+        : {}),
+    });
+    await openServerBlock();
+  };
+
+  it("opens with the project endpoint already chosen, not on Automatic", async () => {
+    storedSettings();
+    await mount();
+
+    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER);
+    expect(screen.getByLabelText("Custom server URI")).toBeEnabled();
+  });
+
+  it("does not offer Automatic, and says why", async () => {
+    storedSettings();
+    await mount();
+
+    expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
+    expect(await screen.findByText(SWARM_NO_AUTOMATIC_REASON)).toBeInTheDocument();
+  });
+
+  it("never asks the public server registry about this chain", async () => {
+    storedSettings();
+    await mount();
+
+    await waitFor(() => expect(screen.getByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER));
+    expect(liveList).not.toHaveBeenCalledWith(SWARM);
+  });
+
+  it("fills the endpoint when the network is picked from the dropdown", async () => {
+    render(<AddNewWallet {...baseProps} />, { initialRoute: "/addnewwallet" });
+    await openServerBlock();
+
+    fireEvent.change(screen.getByRole("combobox", { name: /network/i }), { target: { value: SWARM } });
+
+    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER);
+    expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
+  });
+
+  it("keeps the endpoint chosen through every wallet creation type", async () => {
+    storedSettings();
+    await mount();
+
+    for (const type of ["new", "seed", "ufvk", "file"]) {
+      fireEvent.change(screen.getByRole("combobox", { name: /type of wallet creation/i }), {
+        target: { value: type },
+      });
+      expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER);
+      expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
+    }
+  });
+
+  it("holds the same rule on the change-server screen", async () => {
+    storedSettings({ serveruri: OWN_NODE, serverselection: "custom" });
+    await mount({ mode: "settings" });
+
+    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(OWN_NODE);
+    expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
+  });
+
+  it("offers both project servers and still takes a typed one", async () => {
+    storedSettings();
+    await mount();
+
+    const presets = await screen.findByRole("combobox", { name: /swarm server/i });
+    for (const preset of SWARM_SERVER_PRESETS) {
+      expect(within(presets).getByRole("option", { name: new RegExp(preset.label) })).toBeInTheDocument();
+    }
+
+    fireEvent.change(presets, { target: { value: OWN_NODE } });
+    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(OWN_NODE);
+
+    fireEvent.change(screen.getByLabelText("Custom server URI"), { target: { value: "http://127.0.0.1:1234" } });
+    expect(screen.getByLabelText("Custom server URI")).toHaveValue("http://127.0.0.1:1234");
+  });
+
+  // The default preset is an address the project will host at and does not
+  // host at yet, so this is the first thing a new install meets.
+  it("says the public server is not running rather than failing at the transport", async () => {
+    storedSettings();
+    const openErrorModal = jest.fn();
+    render(<AddNewWallet {...baseProps} />, {
+      initialRoute: "/addnewwallet",
+      contextOverrides: { openErrorModal },
+    });
+    await waitFor(() => expect(screen.getByText(SWARM_DEFAULT_SERVER)).toBeInTheDocument());
+    probe.mockResolvedValue(null);
+
+    fireEvent.click(screen.getByRole("button", { name: /create wallet/i }));
+
+    await waitFor(() => expect(openErrorModal).toHaveBeenCalled());
+    const said = openErrorModal.mock.calls.map((call) => call[1]).join(" ");
+    expect(said).toContain("public server is not running yet");
+    expect(said).toContain(SWARM_DEFAULT_SERVER);
+    // Creation never started: naming the next wallet file is its first step.
+    expect(native.wallet_exists).not.toHaveBeenCalled();
   });
 });
 

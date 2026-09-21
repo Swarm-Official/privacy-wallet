@@ -14,6 +14,7 @@ import APP_VERSION from "../../version";
 import { ServerChainNameEnum, WalletType } from "../appstate";
 import BlockExplorerModal from "./components/BlockExplorerModal";
 import { useCopy } from "../common/useCopy";
+import { SWARM_APP_NAME } from "../../utils/swarmNetwork";
 
 import { ipcRenderer, native } from "../../electronBridge";
 import {
@@ -332,9 +333,12 @@ const Sidebar: React.FC<SidebarProps> = ({ doRescan }) => {
     // About
     const about = (_event: any) => {
       openErrorModal(
-        "Zingo PC",
+        SWARM_APP_NAME,
         <div className={cstyles.verticalflex}>
-          <div className={cstyles.margintoplarge}>Zingo PC v{APP_VERSION}</div>
+          <div className={cstyles.margintoplarge}>
+            {SWARM_APP_NAME} v{APP_VERSION}
+          </div>
+          <div className={cstyles.margintoplarge}>Based on Zingo PC by ZingoLabs, under the licence below.</div>
           <div className={cstyles.margintoplarge}>Built with Electron. Copyright (c) 2026, ZingoLabs.</div>
           <div className={cstyles.margintoplarge}>
             The MIT License (MIT) Copyright (c) 2026 ZingoLabs

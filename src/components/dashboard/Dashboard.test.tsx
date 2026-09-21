@@ -338,8 +338,8 @@ describe("Dashboard", () => {
     it("does not imply the project test coin has a fiat price", () => {
       render(<Dashboard navigateToHistory={jest.fn()} />, {
         contextOverrides: {
-          currentWallet: makeWallet(ServerChainNameEnum.privacyTestnetChainName),
-          info: makeInfo({ chainName: ServerChainNameEnum.privacyTestnetChainName, currencyName: "TEST" }),
+          currentWallet: makeWallet(ServerChainNameEnum.swarmTestnetChainName),
+          info: makeInfo({ chainName: ServerChainNameEnum.swarmTestnetChainName, currencyName: "SWARM" }),
           mixnetView: deriveMixnetView({ mode: "switched_off" }),
         },
       });
