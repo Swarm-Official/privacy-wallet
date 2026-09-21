@@ -53,3 +53,6 @@ zingo-dev.pfx
 # the file sits in the working tree while switching branches, and a branch
 # without this rule will happily pick it up in a `git add -A`.
 src/swap/swapKitSecrets.ts
+
+# The reproducible integration SDK checkout is populated by the build workflow.
+/vendor/zingolib/

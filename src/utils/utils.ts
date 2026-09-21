@@ -145,7 +145,7 @@ export default class Utils {
         resultParseJSON.status &&
         resultParseJSON.status === "success" &&
         resultParseJSON.chain_name &&
-        resultParseJSON.chain_name === currChain
+        Utils.sameAddressNetwork(resultParseJSON.chain_name, currChain)
       ) {
         return resultParseJSON.address_kind;
       } else {
@@ -164,6 +164,11 @@ export default class Utils {
    * Returns an empty string for empty / undefined / unknown values so callers
    * can drop it straight into JSX without a guard.
    */
+  static sameAddressNetwork(encodedNetwork: string | undefined, selectedNetwork: string): boolean {
+    return encodedNetwork === selectedNetwork ||
+      (selectedNetwork === ServerChainNameEnum.privacyTestnetChainName && encodedNetwork === ServerChainNameEnum.testChainName);
+  }
+
   static chainDisplayName(chain: string | undefined): string {
     switch (chain) {
       case ServerChainNameEnum.mainChainName:
@@ -172,6 +177,8 @@ export default class Utils {
         return "Testnet";
       case ServerChainNameEnum.regtestChainName:
         return "Regtest";
+      case ServerChainNameEnum.privacyTestnetChainName:
+        return "Privacy Testnet";
       default:
         return "";
     }
@@ -416,6 +423,7 @@ export default class Utils {
     blockExplorer: BlockExplorerEnum,
     blockExplorerCustom: string,
   ): string => {
+    if (chainName === ServerChainNameEnum.privacyTestnetChainName && blockExplorer !== BlockExplorerEnum.Custom) return "";
     const testnet = chainName === ServerChainNameEnum.testChainName;
     if (blockExplorer === BlockExplorerEnum.Zcashexplorer) {
       return testnet
@@ -450,6 +458,7 @@ export default class Utils {
     blockExplorer: BlockExplorerEnum,
     blockExplorerCustom: string,
   ) => {
+    if (chainName === ServerChainNameEnum.privacyTestnetChainName && blockExplorer !== BlockExplorerEnum.Custom) return;
     if (blockExplorer === BlockExplorerEnum.Zcashexplorer) {
       if (chainName === ServerChainNameEnum.testChainName) {
         shell.openExternal(`https://testnet.zcashexplorer.app/search?qs=${address}`);

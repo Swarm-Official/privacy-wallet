@@ -46,7 +46,7 @@ const MIN_UPTIME = 0.95;
  * throws.
  */
 const fetchServerList = async (chainName: ServerChainNameEnum): Promise<ServerClass[]> => {
-  if (chainName === ServerChainNameEnum.regtestChainName) {
+  if (chainName === ServerChainNameEnum.regtestChainName || chainName === ServerChainNameEnum.privacyTestnetChainName) {
     return [];
   }
 

@@ -61,9 +61,10 @@ const Dashboard: React.FC<DashboardProps> = ({ navigateToHistory }) => {
   // wrong within seconds; `unknown` is the state before the first status read
   // answers, which every launch passes through. Neither is an answer yet.
   const priceNeedsMixnet =
-    mixnetView.statusKey === "mixnet.status.off" ||
-    mixnetView.statusKey === "mixnet.status.unattached" ||
-    mixnetView.statusKey === "mixnet.status.died";
+    info.currencyName === "ZEC" &&
+    (mixnetView.statusKey === "mixnet.status.off" ||
+      mixnetView.statusKey === "mixnet.status.unattached" ||
+      mixnetView.statusKey === "mixnet.status.died");
 
   // How far the scan has got, to put a number on the map below it.
   //

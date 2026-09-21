@@ -1,0 +1,84 @@
+name: Privacy wallet Windows test build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-wallet:
+    runs-on: windows-2025
+    timeout-minutes: 180
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_RELEASE_DEBUG: "0"
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_INCREMENTAL: "0"
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      RUSTUP_TOOLCHAIN: "1.96.0"
+      ZINGOLIB_PATH: ${{ github.workspace }}/vendor/zingolib
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the SDK integration base
+        uses: actions/checkout@v4
+        with:
+          repository: zingolabs/zingolib
+          ref: 7a542ce4a6b14d83bd0108ff3e6c5d8d4c8c71a8
+          path: vendor/zingolib
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: yarn
+      - name: Install build prerequisites
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          choco install protoc --no-progress -y
+          npm install --global yarn@1.22.22
+      - name: Install locked JavaScript dependencies
+        run: yarn install --frozen-lockfile
+      - name: Verify and apply the SDK integration snapshot
+        run: node scripts/prepare-privacy-sdk.js
+      - name: Generate the empty optional swap configuration
+        run: node scripts/generate-swapkit-secrets.js
+      - name: Check the frontend types
+        run: yarn tsc --noEmit
+      - name: Verify network and endpoint boundaries
+        run: node scripts/test.js --watchAll=false --runInBand src/utils/fetchServerList.test.ts src/utils/utils.test.ts src/components/dashboard/Dashboard.test.tsx src/components/send/Send.test.tsx
+      - name: Build the pinned wallet SDK adapter
+        run: yarn neon-win-x64
+      - name: Check Rust dependency pins
+        run: git diff --exit-code -- native/Cargo.lock
+      - name: Build the matching upstream transport helper
+        run: node scripts/stage-nym-proxy.js --strict-rev --target x86_64-pc-windows-msvc
+      - name: Build the desktop frontend
+        run: yarn script:build
+        env:
+          CI: ""
+      - name: Stage the Windows runtime
+        run: node scripts/stage-vcruntime.js --arch x64
+      - name: Verify binary architecture
+        run: node scripts/check-win-arch.js --arch x64
+      - name: Package the unsigned test wallet
+        run: yarn electron-builder --win zip --x64 --config configs/privacy-testnet-builder.cjs --publish never
+      - name: Record build provenance and checksums
+        shell: pwsh
+        run: |
+          git rev-parse HEAD | Set-Content dist/source-commit.txt
+          Get-FileHash dist/*.zip -Algorithm SHA256 | Format-List | Out-File dist/SHA256SUMS.txt
+          Copy-Item native/Cargo.lock dist/Cargo.lock
+          Copy-Item patches/privacy-sdk-v2.json dist/sdk-integration.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: privacy-wallet-windows-x64-unsigned-testnet
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            dist/source-commit.txt
+            dist/Cargo.lock
+            dist/sdk-integration.json
+          retention-days: 14

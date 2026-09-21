@@ -411,7 +411,8 @@ export default class RPC {
       info.serverUri = infoJSON.server_uri;
       info.version = `${infoJSON.vendor}/${infoJSON.git_commit ? infoJSON.git_commit.substring(0, 6) : ""}/${infoJSON.version}`;
       info.zcashdVersion = "Not Available";
-      info.currencyName = info.chainName === ServerChainNameEnum.mainChainName ? "ZEC" : "TAZ";
+      info.currencyName = info.chainName === ServerChainNameEnum.mainChainName ? "ZEC" :
+        info.chainName === ServerChainNameEnum.privacyTestnetChainName ? "TEST" : "TAZ";
       info.solps = 0;
 
       // ZEC price lives outside InfoClass (see `getZecPrice` below) and is
@@ -1469,7 +1470,8 @@ export default class RPC {
     // Skip entirely on testnet / regtest: TAZ has no USD price and the UI
     // doesn't render the value anyway (BalanceBlock only shows USD when
     // currencyName === "ZEC").
-    if (this.currentWallet && this.currentWallet.chain_name !== ServerChainNameEnum.mainChainName) {
+    if (!this.currentWallet || this.currentWallet.chain_name !== ServerChainNameEnum.mainChainName) {
+      this.fnSetZecPrice(0);
       return;
     }
 

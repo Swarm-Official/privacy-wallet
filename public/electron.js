@@ -48,6 +48,15 @@ const { isOpenablePaymentUri } = require("./paymentUri");
 
 const STORAGE_KEY = "wallets";
 const isDev = !app.isPackaged;
+const isPrivacyTestnetBuild = require(path.join(app.getAppPath(), "package.json")).name === "privacy-wallet-testnet";
+if (isPrivacyTestnetBuild && !settings.getSync("all")) {
+  settings.setSync("all", {
+    serveruri: "http://127.0.0.1:19767",
+    serverchain_name: "privacy-testnet",
+    serverselection: "custom",
+    currentwalletid: null,
+  });
+}
 
 // Is the main process's event loop the thing that stalls?
 //
@@ -775,7 +784,7 @@ ipcMain.handle("auth:verify", async (_e, reason) => {
 // ── Keychain-backed requireDeviceAuth ─────────────────────────────────────
 // Missing or deleted entry is treated as true (auth required by default).
 // Only an explicit "false" stored by the user disables the feature.
-const KEYTAR_SERVICE = "Zingo PC";
+const KEYTAR_SERVICE = isPrivacyTestnetBuild ? "Privacy Wallet Testnet" : "Zingo PC";
 const KEYTAR_ACCOUNT = "requireDeviceAuth";
 
 // In-process cache of the value so we only hit Keychain ONCE per session.
@@ -859,6 +868,9 @@ const serverRegistry = createServerRegistry({
 });
 
 ipcMain.handle("servers:fetchList", async (_e, chain) => {
+  if (chain === "privacy-testnet" || settings.getSync("all.serverchain_name") === "privacy-testnet") {
+    return { ok: true, servers: [] };
+  }
   const servers = await serverRegistry.load(chain);
   return servers ? { ok: true, servers } : { ok: false };
 });
@@ -1593,6 +1605,10 @@ async function attachCurrentWallet() {
 }
 
 function spawnProxy() {
+  if (settings.getSync("all.serverchain_name") === "privacy-testnet") {
+    setMixnetPhase("switched_off");
+    return;
+  }
   if (mixnet.child) return;
   mixnet.narration = null;
   setMixnetPhase("bootstrapping");
@@ -1719,6 +1735,9 @@ ipcMain.handle("mixnet:get-status", async () => {
   return snapshot;
 });
 ipcMain.handle("mixnet:enable", async () => {
+  if (settings.getSync("all.serverchain_name") === "privacy-testnet") {
+    throw new Error("Privacy Testnet uses your configured node connection. Mixnet support for this network is pending.");
+  }
   mixnet.intent = "on";
   // Attaching again to a transport the wallet has given up on is the same
   // proxy and the same broken tunnel: it returned instantly, went green, and
@@ -1744,6 +1763,13 @@ ipcMain.handle("mixnet:disable", async () => {
 // Called by the renderer on every wallet load: bring the new client onto the
 // session tunnel (or record the opt-out) without re-bootstrapping.
 ipcMain.handle("mixnet:attach-current", async () => {
+  if (settings.getSync("all.serverchain_name") === "privacy-testnet") {
+    cancelMixnetReconnect();
+    killProxy();
+    await requireNative("stop_mixnet").stop_mixnet();
+    setMixnetPhase("switched_off");
+    return mixnetStatusSnapshot();
+  }
   if (mixnet.intent === "off") {
     try {
       await requireNative("stop_mixnet").stop_mixnet();
@@ -1774,6 +1800,7 @@ const MIXNET_STALE_AFTER_MS = 5 * 60 * 1000;
 let mixnetBlurredAt = null;
 
 function restartMixnet(reason) {
+  if (settings.getSync("all.serverchain_name") === "privacy-testnet") return;
   if (mixnet.intent !== "on") return; // deliberately off: leave it off
   console.log(`[mixnet] restarting after ${reason}`);
   killProxy();

@@ -117,6 +117,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
     main: 419200,
     test: 280000,
     regtest: 1,
+    "privacy-testnet": 1,
     "": 1,
   };
 
@@ -414,7 +415,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
         return;
       }
       const effectiveChain = selectedChain ? selectedChain : ServerChainNameEnum.mainChainName;
-      if (parsed.chain_name !== effectiveChain) {
+      if (!Utils.sameAddressNetwork(parsed.chain_name, effectiveChain)) {
         const friendly = (c: string | undefined) =>
           c === "main" ? "mainnet" : c === "test" ? "testnet" : c === "regtest" ? "regtest" : c;
         openErrorModal(
@@ -942,6 +943,13 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                   setServerExpanded(true);
                   const chain = e.target.value as ServerChainNameEnum | "";
                   setSelectedChain(chain);
+                  if (chain === ServerChainNameEnum.privacyTestnetChainName) {
+                    const endpoint = "http://127.0.0.1:19767";
+                    setSelectedSelection(ServerSelectionEnum.custom);
+                    setCustomServer(endpoint);
+                    setSelectedServer(endpoint);
+                    return;
+                  }
                   // Automatic is a choice about how to pick, not about which
                   // server, so it survives the chain change and re-picks for
                   // the new one. Everything below decides a specific server,
@@ -976,6 +984,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                 <option value="main">{Utils.chainDisplayName(ServerChainNameEnum.mainChainName)}</option>
                 <option value="test">{Utils.chainDisplayName(ServerChainNameEnum.testChainName)}</option>
                 <option value="regtest">{Utils.chainDisplayName(ServerChainNameEnum.regtestChainName)}</option>
+                <option value="privacy-testnet">{Utils.chainDisplayName(ServerChainNameEnum.privacyTestnetChainName)}</option>
               </select>
             </div>
           </div>

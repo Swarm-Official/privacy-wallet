@@ -1,0 +1,833 @@
+diff --git a/docs/privacy-testnet.md b/docs/privacy-testnet.md
+new file mode 100644
+index 00000000..3995dee9
+--- /dev/null
++++ b/docs/privacy-testnet.md
+@@ -0,0 +1,13 @@
++# Privacy testnet wallet profile
++
++`ChainType::CustomTestnet` selects the fixed `privacy-testnet` network. Its V2 genesis hash is `01d6e85dd3c1c128941a849c5025cd2e437258811a2551b82aefd68686c982e1`. The node genesis manifest is maintained in the Privacy Network repository under `genesis/privacy-testnet-v2/manifest.json`.
++
++The profile uses the upstream `NetworkType::Test` address encodings and `ActivationHeights` with every upgrade through NU6.3 activated at height one. New wallets begin scanning at height one. The wallet file stores a dedicated chain tag, and the default data directory ends with `privacy-testnet`. Loading its wallet file under another chain produces a chain-mismatch error. This profile binds its disk tag to this genesis and upgrade schedule.
++
++Applications select the profile through `ClientConfig::builder().set_chain_type(ChainType::CustomTestnet)` and explicitly provide the user's indexer URI. Connection initialization and subsequent sync requests verify the indexer's reported chain name and genesis compact block. `LightClient::verify_network()` exposes the same check. `set_indexer_uri()` returns `LightClientError` so a failed identity check can propagate to the application.
++
++Direct transmission verifies the destination immediately before submitting a transaction, including destinations selected for migration. The project's destination registry contains user-configured endpoints. Mixnet transmission requires a future adapter that verifies identity through that transport, so this profile currently requires the direct route. Existing network profiles retain their upstream routing behavior.
++
++This change preserves upstream key derivation, transaction construction, proof generation and cryptographic dependencies. Genesis checks identify the selected network within the existing light-client trust model. Applications should label these test coins separately from ZEC and keep fiat pricing disabled until project market discovery exists.
++
++Focused regression tests use the `privacy_` filter. They cover upgrade parameters, wallet serialization and cross-network rejection, network identity byte order, explicit endpoint selection, and rejection of a different chain before sync or sending.
+diff --git a/zingo-cli/src/commands.rs b/zingo-cli/src/commands.rs
+index 7bb69240..da1b9988 100644
+--- a/zingo-cli/src/commands.rs
++++ b/zingo-cli/src/commands.rs
+@@ -1002,6 +1002,7 @@ fn parse_address(address: &str) -> Result<String, CommandError> {
+             let chain_name_string = match chain_name {
+                 zingolib::config::ChainType::Mainnet => "main",
+                 zingolib::config::ChainType::Testnet => "test",
++                zingolib::config::ChainType::CustomTestnet => zingolib::config::PRIVACY_TESTNET_NAME,
+                 zingolib::config::ChainType::Regtest(_) => "regtest",
+                 _ => unreachable!("Invalid chain type"),
+             };
+@@ -1175,7 +1176,7 @@ pub enum NetworkCommandError {
+     #[error("failed to connect to '{uri}' while switching to Online Mode")]
+     GoOnline {
+         uri: String,
+-        source: zingolib::netutils::GetClientError,
++        source: zingolib::lightclient::error::LightClientError,
+     },
+     #[error("failed to start the nym proxy at '{path}'")]
+     ProxyStart {
+diff --git a/zingo-cli/src/lib.rs b/zingo-cli/src/lib.rs
+index a3803995..e9d231f7 100644
+--- a/zingo-cli/src/lib.rs
++++ b/zingo-cli/src/lib.rs
+@@ -69,7 +69,7 @@ pub fn build_clap_app() -> clap::Command {
+                 .long("chain").short('c')
+                 .value_name("CHAIN")
+                 .help(
+-                    r#"What chain to expect. One of "mainnet", "testnet", or "regtest". Defaults to "mainnet""#
++                    r#"What chain to expect. One of "mainnet", "testnet", "privacy-testnet", or "regtest". Defaults to "mainnet""#
+                 ))
+             .arg(Arg::new("seed")
+                 .short('s')
+@@ -567,6 +567,7 @@ fn start_interactive(cli_config: &CliConfigTemplate, ch: CommandChannel) -> Exit
+     let chain_name = match cli_config.chaintype {
+         ChainType::Mainnet => "main",
+         ChainType::Testnet => "test",
++        ChainType::CustomTestnet => zingolib::config::PRIVACY_TESTNET_NAME,
+         ChainType::Regtest(_) => "regtest",
+     };
+ 
+@@ -1512,6 +1513,7 @@ fn census_chain(chain: &ChainType) -> Option<zingolib::indexers::IndexerChain> {
+     match chain {
+         ChainType::Mainnet => Some(zingolib::indexers::IndexerChain::Main),
+         ChainType::Testnet => Some(zingolib::indexers::IndexerChain::Test),
++        ChainType::CustomTestnet => None,
+         ChainType::Regtest(_) => None,
+     }
+ }
+diff --git a/zingolib/src/config.rs b/zingolib/src/config.rs
+index cc1ef534..74221cb6 100644
+--- a/zingolib/src/config.rs
++++ b/zingolib/src/config.rs
+@@ -49,6 +49,31 @@ pub const LIB_BIRTHDAY_MAINNET: u32 = 3_411_499;
+ /// testnet (unlike mainnet, where its activation is still scheduled).
+ pub const LIB_BIRTHDAY_TESTNET: u32 = 4_134_000;
+ 
++/// The fixed Privacy testnet profile's first spendable block and upgrade height.
++pub const PRIVACY_TESTNET_BIRTHDAY: u32 = 1;
++/// The fixed Privacy testnet's display-order genesis hash.
++pub const PRIVACY_TESTNET_GENESIS: &str =
++    "01d6e85dd3c1c128941a849c5025cd2e437258811a2551b82aefd68686c982e1";
++/// The indexer and wallet identity for the fixed Privacy testnet profile.
++pub const PRIVACY_TESTNET_NAME: &str = "privacy-testnet";
++
++/// The upgrade schedule bound to [`PRIVACY_TESTNET_GENESIS`].
++pub fn privacy_testnet_activation_heights() -> ActivationHeights {
++    let height = Some(PRIVACY_TESTNET_BIRTHDAY);
++    ActivationHeights::builder()
++        .set_overwinter(height)
++        .set_sapling(height)
++        .set_blossom(height)
++        .set_heartwood(height)
++        .set_canopy(height)
++        .set_nu5(height)
++        .set_nu6(height)
++        .set_nu6_1(height)
++        .set_nu6_2(height)
++        .set_nu6_3(height)
++        .build()
++}
++
+ /// Returns the Library Birthday for the given chain: a block height known to
+ /// have been mined before this zingolib release was cut, safe as the
+ /// [`WalletConfig::NewSeed`] `chain_height` for a wallet created while
+@@ -61,6 +86,7 @@ pub fn lib_birthday(chain: ChainType) -> u32 {
+     match chain {
+         ChainType::Mainnet => LIB_BIRTHDAY_MAINNET,
+         ChainType::Testnet => LIB_BIRTHDAY_TESTNET,
++        ChainType::CustomTestnet => PRIVACY_TESTNET_BIRTHDAY,
+         // A regtest chain is born alongside its wallets; scanning from
+         // genesis is both correct and cheap.
+         ChainType::Regtest(_) => 1,
+@@ -74,6 +100,8 @@ pub enum ChainType {
+     Mainnet,
+     /// Testnet
+     Testnet,
++    /// The fixed Privacy testnet profile, identified by [`PRIVACY_TESTNET_GENESIS`].
++    CustomTestnet,
+     /// Regtest
+     Regtest(ActivationHeights),
+ }
+@@ -83,6 +111,7 @@ impl std::fmt::Display for ChainType {
+         let chain = match self {
+             ChainType::Mainnet => "mainnet",
+             ChainType::Testnet => "testnet",
++            ChainType::CustomTestnet => PRIVACY_TESTNET_NAME,
+             ChainType::Regtest(_) => "regtest",
+         };
+         write!(f, "{chain}")
+@@ -96,6 +125,7 @@ impl TryFrom<&str> for ChainType {
+         match value {
+             "mainnet" => Ok(ChainType::Mainnet),
+             "testnet" => Ok(ChainType::Testnet),
++            PRIVACY_TESTNET_NAME => Ok(ChainType::CustomTestnet),
+             "regtest" => Ok(ChainType::Regtest(ActivationHeights::default())),
+             _ => Err(InvalidChainType(value.to_string())),
+         }
+@@ -114,6 +144,7 @@ pub(crate) mod consealed {
+             match self {
+                 ChainType::Mainnet => NetworkType::Main,
+                 ChainType::Testnet => NetworkType::Test,
++                ChainType::CustomTestnet => NetworkType::Test,
+                 ChainType::Regtest(_) => NetworkType::Regtest,
+             }
+         }
+@@ -122,6 +153,10 @@ pub(crate) mod consealed {
+             match self {
+                 ChainType::Mainnet => MAIN_NETWORK.activation_height(nu),
+                 ChainType::Testnet => TEST_NETWORK.activation_height(nu),
++                ChainType::CustomTestnet => {
++                    ChainType::Regtest(super::privacy_testnet_activation_heights())
++                        .activation_height(nu)
++                }
+                 ChainType::Regtest(activation_heights) => match nu {
+                     NetworkUpgrade::Overwinter => {
+                         activation_heights.overwinter().map(BlockHeight::from_u32)
+@@ -151,7 +186,7 @@ pub(crate) mod consealed {
+ 
+ /// Invalid chain type.
+ #[derive(thiserror::Error, Debug)]
+-#[error("Invalid chain type '{0}'. Expected one of: 'mainnet', 'testnet' or 'regtest'.")]
++#[error("Invalid chain type '{0}'. Expected 'mainnet', 'testnet', 'privacy-testnet' or 'regtest'.")]
+ pub struct InvalidChainType(String);
+ 
+ /// Configuration data for the construction of a [`crate::wallet::LightWallet`].
+@@ -203,8 +238,11 @@ impl WalletConfig {
+                 let sapling_activation_height = chain_type
+                     .activation_height(zcash_protocol::consensus::NetworkUpgrade::Sapling)
+                     .expect("should have some sapling activation height");
+-                let birthday =
+-                    sapling_activation_height.max(BlockHeight::from_u32(chain_height) - 100);
++                let birthday = if chain_type == ChainType::CustomTestnet {
++                    BlockHeight::from_u32(PRIVACY_TESTNET_BIRTHDAY)
++                } else {
++                    sapling_activation_height.max(BlockHeight::from_u32(chain_height) - 100)
++                };
+ 
+                 WalletConfig::MnemonicPhrase {
+                     mnemonic_phrase: Mnemonic::<English>::generate(bip0039::Count::Words24)
+@@ -553,6 +591,7 @@ fn wallet_dir_or_default(
+                 match chain {
+                     ChainType::Mainnet => {}
+                     ChainType::Testnet => dir.push("testnet3"),
++                    ChainType::CustomTestnet => dir.push(PRIVACY_TESTNET_NAME),
+                     ChainType::Regtest(_) => dir.push("regtest"),
+                 }
+ 
+@@ -584,6 +623,69 @@ pub enum ClientConfigError {
+ mod tests {
+     use crate::config::{ChainType, ClientConfig};
+ 
++    #[test]
++    fn privacy_profile_keeps_test_encoding_and_early_upgrades() {
++        use super::{PRIVACY_TESTNET_BIRTHDAY, PRIVACY_TESTNET_NAME};
++        use zcash_protocol::consensus::{
++            BlockHeight, BranchId, NetworkType, NetworkUpgrade, Parameters,
++        };
++
++        let chain = ChainType::CustomTestnet;
++        let activation = BlockHeight::from_u32(PRIVACY_TESTNET_BIRTHDAY);
++        assert_eq!(ChainType::try_from(PRIVACY_TESTNET_NAME).unwrap(), chain);
++        assert_eq!(chain.to_string(), PRIVACY_TESTNET_NAME);
++        assert_eq!(chain.network_type(), NetworkType::Test);
++        assert_eq!(super::lib_birthday(chain), PRIVACY_TESTNET_BIRTHDAY);
++        for upgrade in [
++            NetworkUpgrade::Overwinter,
++            NetworkUpgrade::Sapling,
++            NetworkUpgrade::Blossom,
++            NetworkUpgrade::Heartwood,
++            NetworkUpgrade::Canopy,
++            NetworkUpgrade::Nu5,
++            NetworkUpgrade::Nu6,
++            NetworkUpgrade::Nu6_1,
++            NetworkUpgrade::Nu6_2,
++            NetworkUpgrade::Nu6_3,
++        ] {
++            assert_eq!(chain.activation_height(upgrade), Some(activation));
++        }
++        assert_eq!(BranchId::for_height(&chain, activation), BranchId::Nu6_3);
++        assert_ne!(chain, ChainType::Testnet);
++    }
++
++    #[test]
++    fn privacy_wallet_disk_identity_and_birthday_roundtrip() {
++        use super::{PRIVACY_TESTNET_BIRTHDAY, WalletConfig};
++        use crate::wallet::{LightWallet, WalletSettings};
++
++        let chain = ChainType::CustomTestnet;
++        let mut wallet = LightWallet::new(
++            chain,
++            WalletConfig::NewSeed {
++                no_of_accounts: std::num::NonZeroU32::MIN,
++                chain_height: PRIVACY_TESTNET_BIRTHDAY,
++                wallet_settings: WalletSettings::default(),
++            },
++        )
++        .unwrap();
++        assert_eq!(u32::from(wallet.birthday()), PRIVACY_TESTNET_BIRTHDAY);
++        let mut bytes = Vec::new();
++        wallet.write(&mut bytes, &chain).unwrap();
++        let restored = LightWallet::read(bytes.as_slice(), chain).unwrap();
++        assert_eq!(restored.chain_type(), chain);
++        assert_eq!(u32::from(restored.birthday()), PRIVACY_TESTNET_BIRTHDAY);
++        assert!(LightWallet::read(bytes.as_slice(), ChainType::Testnet).is_err());
++        assert!(LightWallet::read(bytes.as_slice(), ChainType::Mainnet).is_err());
++        assert!(
++            LightWallet::read(
++                bytes.as_slice(),
++                ChainType::Regtest(crate::ActivationHeights::default())
++            )
++            .is_err()
++        );
++    }
++
+     #[tokio::test]
+     async fn test_load_clientconfig() {
+         let valid_uri =
+diff --git a/zingolib/src/destination/servers.rs b/zingolib/src/destination/servers.rs
+index bf20c1af..b5b906c3 100644
+--- a/zingolib/src/destination/servers.rs
++++ b/zingolib/src/destination/servers.rs
+@@ -35,7 +35,7 @@ impl Trust {
+     pub fn remote_default(chain: &ChainType) -> Self {
+         match chain {
+             ChainType::Mainnet => Trust::Untrusted,
+-            ChainType::Testnet | ChainType::Regtest(_) => Trust::Trusted,
++            ChainType::Testnet | ChainType::CustomTestnet | ChainType::Regtest(_) => Trust::Trusted,
+         }
+     }
+ }
+@@ -184,7 +184,7 @@ fn registry_chain(chain: &ChainType) -> Option<IndexerChain> {
+     match chain {
+         ChainType::Mainnet => Some(IndexerChain::Main),
+         ChainType::Testnet => Some(IndexerChain::Test),
+-        ChainType::Regtest(_) => None,
++        ChainType::CustomTestnet | ChainType::Regtest(_) => None,
+     }
+ }
+ 
+@@ -552,6 +552,14 @@ mod tests {
+         ChainType::Regtest(crate::ActivationHeights::default())
+     }
+ 
++    #[test]
++    fn privacy_profile_uses_only_configured_destinations() {
++        let set = DestinationServerSet::for_chain(&ChainType::CustomTestnet, None, Vec::new());
++        assert!(set.registry.is_empty());
++        assert!(set.configured.is_empty());
++        assert!(set.draw(Transport::Clearnet, None, &Health::default()).is_err());
++    }
++
+     fn drawn(set: &DestinationServerSet, transport: Transport, sync: Option<&Uri>) -> Vec<Uri> {
+         set.draw(transport, sync, &Health::default())
+             .expect("the draw has candidates")
+diff --git a/zingolib/src/lib.rs b/zingolib/src/lib.rs
+index 691d654a..dac76d48 100644
+--- a/zingolib/src/lib.rs
++++ b/zingolib/src/lib.rs
+@@ -58,6 +58,7 @@ pub fn get_zennies_for_zingo_address(chain_type: ChainType) -> &'static str {
+     match chain_type {
+         ChainType::Mainnet => ZENNIES_FOR_ZINGO_DONATION_ADDRESS,
+         ChainType::Testnet => ZENNIES_FOR_ZINGO_TESTNET_ADDRESS,
++        ChainType::CustomTestnet => ZENNIES_FOR_ZINGO_TESTNET_ADDRESS,
+         ChainType::Regtest(_) => ZENNIES_FOR_ZINGO_REGTEST_ADDRESS,
+     }
+ }
+diff --git a/zingolib/src/lightclient.rs b/zingolib/src/lightclient.rs
+index f606a59c..5e471bb2 100644
+--- a/zingolib/src/lightclient.rs
++++ b/zingolib/src/lightclient.rs
+@@ -45,6 +45,7 @@ pub mod indexer_history;
+ pub mod migrate;
+ #[cfg(feature = "nym")]
+ mod mixnet;
++pub(crate) mod network;
+ pub mod offline;
+ pub mod propose;
+ pub mod save;
+@@ -253,6 +254,15 @@ impl LightClient {
+         // For https URIs GrpcIndexer::new pre-builds a TLS endpoint, which requires a rustls CryptoProvider.
+         zingo_netutils::ensure_default_crypto_provider();
+ 
++        let mut checked_indexer = None;
++        if config.chain_type() == ChainType::CustomTestnet
++            && let Some(uri) = config.indexer_uri()
++        {
++            let mut indexer = zingo_netutils::GrpcIndexer::new(uri).await?;
++            network::verify_indexer(config.chain_type(), &mut indexer).await?;
++            checked_indexer = Some(indexer);
++        }
++
+         let wallet = match config.wallet_config() {
+             WalletConfig::Read => {
+                 let buffer = BufReader::new(
+@@ -283,10 +293,10 @@ impl LightClient {
+         // For https URIs GrpcIndexer::new pre-builds a TLS endpoint, which requires a rustls CryptoProvider.
+         zingo_netutils::ensure_default_crypto_provider();
+ 
+-        // No configured URI means the client starts offline; set_indexer_uri() connects later.
+-        let indexer = match config.indexer_uri() {
+-            Some(uri) => Some(zingo_netutils::GrpcIndexer::new(uri).await?),
+-            None => None,
++        let indexer = match (checked_indexer, config.indexer_uri()) {
++            (Some(indexer), _) => Some(indexer),
++            (None, Some(uri)) => Some(zingo_netutils::GrpcIndexer::new(uri).await?),
++            (None, None) => None,
+         };
+ 
+         Ok(LightClient {
+@@ -619,11 +629,10 @@ impl LightClient {
+     ///
+     /// Creates a new gRPC connection to the given URI. After this call the client is online and
+     /// network operations such as [`Self::sync`] become available.
+-    pub async fn set_indexer_uri(
+-        &mut self,
+-        server: http::Uri,
+-    ) -> Result<(), zingo_netutils::GetClientError> {
+-        self.indexer = Some(zingo_netutils::GrpcIndexer::new(server).await?);
++    pub async fn set_indexer_uri(&mut self, server: http::Uri) -> Result<(), LightClientError> {
++        let mut indexer = zingo_netutils::GrpcIndexer::new(server).await?;
++        network::verify_indexer(self.chain_type(), &mut indexer).await?;
++        self.indexer = Some(indexer);
+         Ok(())
+     }
+ 
+diff --git a/zingolib/src/lightclient/migrate.rs b/zingolib/src/lightclient/migrate.rs
+index 026c4326..a2a0c71b 100644
+--- a/zingolib/src/lightclient/migrate.rs
++++ b/zingolib/src/lightclient/migrate.rs
+@@ -973,9 +973,10 @@ impl LightClient {
+                  correlate synchronization with migration activity"
+             );
+         }
+-        Ok(transmission_route::RoutedTransmissionClient::new(
+-            wire, candidates,
+-        ))
++        Ok(
++            transmission_route::RoutedTransmissionClient::new(wire, candidates)
++                .with_chain(self.chain_type()),
++        )
+     }
+ 
+     /// Materializes and transmits every part whose bucket window is open.
+diff --git a/zingolib/src/lightclient/migrate/transmission_grpc.rs b/zingolib/src/lightclient/migrate/transmission_grpc.rs
+index a183683b..eb1bc2cb 100644
+--- a/zingolib/src/lightclient/migrate/transmission_grpc.rs
++++ b/zingolib/src/lightclient/migrate/transmission_grpc.rs
+@@ -19,13 +19,22 @@ pub(super) use zingo_netutils::time::MIGRATION_SUBMIT_TIMEOUT;
+ /// Submits parts over gRPC and can do nothing else.
+ pub struct GrpcTransmissionClient {
+     uri: http::Uri,
++    chain: crate::config::ChainType,
+ }
+ 
+ impl GrpcTransmissionClient {
+     /// A client submitting to `uri`, ideally the dedicated
+     /// `migration_transmission_uri` rather than the synchronization endpoint.
+     pub fn new(uri: http::Uri) -> Self {
+-        GrpcTransmissionClient { uri }
++        GrpcTransmissionClient {
++            uri,
++            chain: crate::config::ChainType::Mainnet,
++        }
++    }
++
++    pub(super) fn with_chain(mut self, chain: crate::config::ChainType) -> Self {
++        self.chain = chain;
++        self
+     }
+ }
+ 
+@@ -38,6 +47,9 @@ impl TransmissionClient for GrpcTransmissionClient {
+         let mut indexer = zingo_netutils::GrpcIndexer::new(self.uri.clone())
+             .await
+             .map_err(|e| PartTransmissionError::Transport(e.to_string()))?;
++        crate::lightclient::network::verify_indexer(self.chain, &mut indexer)
++            .await
++            .map_err(|status| PartTransmissionError::Rejected(status.to_string()))?;
+         let txid_hex = indexer
+             .send_transaction(
+                 RawTransaction {
+diff --git a/zingolib/src/lightclient/migrate/transmission_route.rs b/zingolib/src/lightclient/migrate/transmission_route.rs
+index 62f4c4a2..fe512426 100644
+--- a/zingolib/src/lightclient/migrate/transmission_route.rs
++++ b/zingolib/src/lightclient/migrate/transmission_route.rs
+@@ -47,11 +47,21 @@ impl MigrationWire {
+ pub struct RoutedTransmissionClient {
+     wire: MigrationWire,
+     candidates: Vec<http::Uri>,
++    chain: crate::config::ChainType,
+ }
+ 
+ impl RoutedTransmissionClient {
+     pub(crate) fn new(wire: MigrationWire, candidates: Vec<http::Uri>) -> Self {
+-        RoutedTransmissionClient { wire, candidates }
++        RoutedTransmissionClient {
++            wire,
++            candidates,
++            chain: crate::config::ChainType::Mainnet,
++        }
++    }
++
++    pub(crate) fn with_chain(mut self, chain: crate::config::ChainType) -> Self {
++        self.chain = chain;
++        self
+     }
+ 
+     #[cfg(all(test, feature = "nym"))]
+@@ -77,11 +87,18 @@ impl TransmissionClient for RoutedTransmissionClient {
+         match &self.wire {
+             MigrationWire::Clearnet => {
+                 GrpcTransmissionClient::new(indexer.clone())
++                    .with_chain(self.chain)
+                     .submit(raw_tx, expiry_height)
+                     .await
+             }
+             #[cfg(feature = "nym")]
+             MigrationWire::Mixnet(dial) => {
++                if self.chain == crate::config::ChainType::CustomTestnet {
++                    return Err(PartTransmissionError::Rejected(
++                        "Privacy testnet requires a directly verified indexer connection"
++                            .to_string(),
++                    ));
++                }
+                 submit_over_socks5(dial, indexer, raw_tx, expiry_height).await
+             }
+         }
+diff --git a/zingolib/src/lightclient/network.rs b/zingolib/src/lightclient/network.rs
+new file mode 100644
+index 00000000..03e068c6
+--- /dev/null
++++ b/zingolib/src/lightclient/network.rs
+@@ -0,0 +1,160 @@
++//! Indexer identity checks for the fixed Privacy testnet profile.
++
++use zingo_netutils::{Indexer, Status, lightwallet_protocol::BlockId};
++
++use crate::config::{ChainType, PRIVACY_TESTNET_GENESIS, PRIVACY_TESTNET_NAME};
++
++use super::{DEFAULT_REQUEST_TIMEOUT, LightClient, error::LightClientError};
++
++const GENESIS_HEIGHT: u64 = 0;
++
++pub(crate) fn check_identity(chain_name: &str, height: u64, hash: &[u8]) -> Result<(), Status> {
++    let display_hash = hex::encode(hash.iter().rev().copied().collect::<Vec<_>>());
++    if chain_name != PRIVACY_TESTNET_NAME
++        || height != GENESIS_HEIGHT
++        || display_hash != PRIVACY_TESTNET_GENESIS
++    {
++        Err(Status::failed_precondition(
++            "Indexer identity differs from the configured Privacy testnet",
++        ))
++    } else {
++        Ok(())
++    }
++}
++
++pub(crate) async fn verify_indexer(
++    chain: ChainType,
++    indexer: &mut impl Indexer,
++) -> Result<(), Status> {
++    if chain == ChainType::CustomTestnet {
++        let info = indexer.get_lightd_info(DEFAULT_REQUEST_TIMEOUT).await?;
++        if info.chain_name != PRIVACY_TESTNET_NAME {
++            return Err(Status::failed_precondition(
++                "Indexer chain name differs from the configured Privacy testnet",
++            ));
++        }
++        let genesis = indexer
++            .get_block(
++                BlockId {
++                    height: GENESIS_HEIGHT,
++                    hash: Vec::new(),
++                },
++                DEFAULT_REQUEST_TIMEOUT,
++            )
++            .await?;
++        check_identity(&info.chain_name, genesis.height, &genesis.hash)?;
++    }
++    Ok(())
++}
++
++impl LightClient {
++    /// Verifies the connected indexer against the selected chain profile.
++    pub async fn verify_network(&self) -> Result<(), LightClientError> {
++        let mut indexer = self.require_indexer()?.clone();
++        verify_indexer(self.chain_type(), &mut indexer).await?;
++        Ok(())
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn genesis_bytes() -> Vec<u8> {
++        let mut hash = hex::decode(PRIVACY_TESTNET_GENESIS).unwrap();
++        hash.reverse();
++        hash
++    }
++
++    #[test]
++    fn privacy_identity_requires_name_height_and_wire_hash() {
++        let hash = genesis_bytes();
++        assert!(check_identity(PRIVACY_TESTNET_NAME, GENESIS_HEIGHT, &hash).is_ok());
++        assert!(check_identity("test", GENESIS_HEIGHT, &hash).is_err());
++        assert!(check_identity(PRIVACY_TESTNET_NAME, GENESIS_HEIGHT + 1, &hash).is_err());
++        assert!(check_identity(PRIVACY_TESTNET_NAME, GENESIS_HEIGHT, &[]).is_err());
++        let display_bytes = hex::decode(PRIVACY_TESTNET_GENESIS).unwrap();
++        assert!(check_identity(PRIVACY_TESTNET_NAME, GENESIS_HEIGHT, &display_bytes).is_err());
++    }
++
++    #[tokio::test]
++    async fn privacy_client_rejects_a_different_chain_before_connecting_or_syncing() {
++        use crate::config::{ClientConfig, PRIVACY_TESTNET_BIRTHDAY, WalletConfig};
++        use crate::testutils::mock_indexer::MockNet;
++        use crate::wallet::WalletSettings;
++
++        let network = MockNet::launch().await;
++        let directory = tempfile::tempdir().unwrap();
++        let config = ClientConfig::builder()
++            .set_chain_type(ChainType::CustomTestnet)
++            .set_wallet_dir(directory.path().to_path_buf())
++            .set_wallet_config(WalletConfig::NewSeed {
++                no_of_accounts: std::num::NonZeroU32::MIN,
++                chain_height: PRIVACY_TESTNET_BIRTHDAY,
++                wallet_settings: WalletSettings::default(),
++            })
++            .build()
++            .unwrap();
++        let mut client = LightClient::new(config, false).await.unwrap();
++        assert!(client.set_indexer_uri(network.indexer_uri()).await.is_err());
++        assert!(client.indexer_uri().is_none());
++        client.set_indexer_uri_lazy(network.indexer_uri()).unwrap();
++        assert!(matches!(
++            client.sync().await,
++            Err(LightClientError::IndexerError(_))
++        ));
++        assert!(matches!(
++            client.send_stored_proposal(false).await,
++            Err(LightClientError::IndexerError(_))
++        ));
++    }
++
++    #[tokio::test]
++    #[ignore = "requires PRIVACY_TESTNET_INDEXER pointing to the project indexer"]
++    async fn privacy_live_indexer_identity_and_sync() {
++        use crate::config::{ClientConfig, PRIVACY_TESTNET_BIRTHDAY, WalletConfig};
++        use crate::wallet::WalletSettings;
++
++        let uri = std::env::var("PRIVACY_TESTNET_INDEXER")
++            .unwrap()
++            .parse()
++            .unwrap();
++        let directory = tempfile::tempdir().unwrap();
++        let config = ClientConfig::builder()
++            .set_chain_type(ChainType::CustomTestnet)
++            .set_indexer_uri(uri)
++            .set_wallet_dir(directory.path().to_path_buf())
++            .set_wallet_config(WalletConfig::NewSeed {
++                no_of_accounts: std::num::NonZeroU32::MIN,
++                chain_height: PRIVACY_TESTNET_BIRTHDAY,
++                wallet_settings: WalletSettings::default(),
++            })
++            .build()
++            .unwrap();
++        let mut client = LightClient::new(config, false).await.unwrap();
++        client.verify_network().await.unwrap();
++        client.sync_and_await().await.unwrap();
++    }
++
++    #[tokio::test]
++    #[ignore = "requires PRIVACY_OTHER_INDEXER pointing to a different network"]
++    async fn privacy_live_rejects_other_network() {
++        use crate::config::ClientConfig;
++
++        let uri = std::env::var("PRIVACY_OTHER_INDEXER")
++            .unwrap()
++            .parse()
++            .unwrap();
++        let directory = tempfile::tempdir().unwrap();
++        let config = ClientConfig::builder()
++            .set_chain_type(ChainType::CustomTestnet)
++            .set_indexer_uri(uri)
++            .set_wallet_dir(directory.path().to_path_buf())
++            .build()
++            .unwrap();
++        assert!(matches!(
++            LightClient::new(config, false).await,
++            Err(LightClientError::IndexerError(_))
++        ));
++    }
++}
+diff --git a/zingolib/src/lightclient/select.rs b/zingolib/src/lightclient/select.rs
+index 933d29b0..a37a301f 100644
+--- a/zingolib/src/lightclient/select.rs
++++ b/zingolib/src/lightclient/select.rs
+@@ -298,6 +298,7 @@ fn lightd_chain_name(chain: &crate::config::ChainType) -> &'static str {
+     match chain {
+         crate::config::ChainType::Mainnet => "main",
+         crate::config::ChainType::Testnet => "test",
++        crate::config::ChainType::CustomTestnet => crate::config::PRIVACY_TESTNET_NAME,
+         crate::config::ChainType::Regtest(_) => "regtest",
+     }
+ }
+diff --git a/zingolib/src/lightclient/send.rs b/zingolib/src/lightclient/send.rs
+index 028bf2cb..f7254ad6 100644
+--- a/zingolib/src/lightclient/send.rs
++++ b/zingolib/src/lightclient/send.rs
+@@ -171,14 +171,17 @@ fn retarget_for_offline_signing<NoteRef: Clone>(
+ }
+ 
+ /// A gRPC indexer as a [`TransmitTarget`].
+-struct ClearnetTarget(zingo_netutils::GrpcIndexer);
++struct ClearnetTarget(zingo_netutils::GrpcIndexer, ChainType);
+ 
+ impl ClearnetTarget {
+     /// A target for `destination`, connecting on first use.
+-    fn lazy(destination: http::Uri) -> Result<Self, zingo_net_diag::NetOpFailure> {
++    fn lazy(
++        destination: http::Uri,
++        chain: ChainType,
++    ) -> Result<Self, zingo_net_diag::NetOpFailure> {
+         let host = crate::destination::Host::of_uri(&destination);
+         zingo_netutils::GrpcIndexer::new_lazy(destination)
+-            .map(ClearnetTarget)
++            .map(|indexer| ClearnetTarget(indexer, chain))
+             .map_err(|error| {
+                 zingo_net_diag::NetOpFailure::from_error(
+                     zingo_net_diag::NetOpStage::RouteResolution,
+@@ -210,7 +213,9 @@ impl TransmitTarget for ClearnetTarget {
+     ) -> impl Future<Output = Result<String, zingo_netutils::Status>> + Send {
+         let mut client = self.0.clone();
+         let data = raw_tx.to_vec();
++        let chain = self.1;
+         async move {
++            super::network::verify_indexer(chain, &mut client).await?;
+             client
+                 .send_transaction(RawTransaction { data, height }, DEFAULT_REQUEST_TIMEOUT)
+                 .await
+@@ -220,7 +225,14 @@ impl TransmitTarget for ClearnetTarget {
+     fn knows_transaction(&self, txid: &TxId) -> impl Future<Output = bool> + Send {
+         let mut client = self.0.clone();
+         let hash = txid.as_ref().to_vec();
++        let chain = self.1;
+         async move {
++            if super::network::verify_indexer(chain, &mut client)
++                .await
++                .is_err()
++            {
++                return false;
++            }
+             client
+                 .get_transaction(
+                     TxFilter {
+@@ -325,6 +337,7 @@ impl Wire {
+ 
+ /// The ambient state a transmission narrates through, records against, and paces itself by.
+ struct TransmitContext<'a> {
++    chain: ChainType,
+     progress: &'a TransmitProgressHandle,
+     history: &'a IndexerHistoryHandle,
+     retry_interval: std::time::Duration,
+@@ -351,7 +364,7 @@ async fn transmit_one_transaction(
+             rotate_transmit(
+                 wire,
+                 &draw,
+-                ClearnetTarget::lazy,
++                |destination| ClearnetTarget::lazy(destination, context.chain),
+                 ClearnetTarget::failure,
+                 tx_bytes,
+                 height,
+@@ -385,7 +398,7 @@ async fn transmit_one_transaction(
+             rotate_transmit(
+                 wire,
+                 &draw,
+-                ClearnetTarget::lazy,
++                |destination| ClearnetTarget::lazy(destination, context.chain),
+                 ClearnetTarget::failure,
+                 tx_bytes,
+                 height,
+@@ -477,6 +490,9 @@ impl LightClient {
+         sending_account: zip32::AccountId,
+     ) -> Result<NonEmpty<TransmitReport>, LightClientError> {
+         self.preflight_transmit()?;
++        if self.chain_type() == ChainType::CustomTestnet {
++            self.verify_network().await?;
++        }
+         let indexerless = self.indexer.is_none();
+         let mut wallet = self.wallet().write().await;
+         // An Indexerless calculation cannot trust the wallet's stale chain
+@@ -531,6 +547,9 @@ impl LightClient {
+         resume_sync: bool,
+     ) -> Result<NonEmpty<TxId>, LightClientError> {
+         self.require_indexer()?;
++        if self.chain_type() == ChainType::CustomTestnet {
++            self.verify_network().await?;
++        }
+         let opt_proposal = self.wallet().write().await.take_proposal();
+         if let Some(proposal) = opt_proposal {
+             let reports = match proposal {
+@@ -907,6 +926,9 @@ impl LightClient {
+         &mut self,
+         calculated_txids: NonEmpty<TxId>,
+     ) -> Result<NonEmpty<TransmitReport>, LightClientError> {
++        if self.chain_type() == ChainType::CustomTestnet {
++            self.verify_network().await?;
++        }
+         let indexer = self.indexer.clone();
+ 
+         // Resolve the send route once for the whole send (ADR 0011), under
+@@ -938,6 +960,12 @@ impl LightClient {
+         };
+         #[cfg(not(feature = "nym"))]
+         let wire = Wire::Clearnet;
++        if self.chain_type() == ChainType::CustomTestnet && wire.is_mixnet() {
++            return Err(zingo_netutils::Status::failed_precondition(
++                "Privacy testnet requires a directly verified indexer connection",
++            )
++            .into());
++        }
+         if !wire.is_mixnet() && indexer.is_none() {
+             return Err(LightClientError::Offline);
+         }
+@@ -981,6 +1009,7 @@ impl LightClient {
+ 
+             let dispatched = std::time::Instant::now();
+             let transmit_context = TransmitContext {
++                chain: self.chain_type(),
+                 progress: &progress,
+                 history: &history,
+                 retry_interval: self.transmit_retry_interval,
+@@ -1208,6 +1237,7 @@ mod transmit_error_seam {
+             ARBITRARY_HEIGHT,
+             &TxId::from_bytes([0u8; 32]),
+             &TransmitContext {
++                chain: ChainType::Mainnet,
+                 progress: &progress,
+                 history: &history,
+                 retry_interval: zingo_netutils::time::TRANSMIT_RETRY_INTERVAL,
+diff --git a/zingolib/src/lightclient/sync.rs b/zingolib/src/lightclient/sync.rs
+index 285bd444..c65cc983 100644
+--- a/zingolib/src/lightclient/sync.rs
++++ b/zingolib/src/lightclient/sync.rs
+@@ -32,6 +32,9 @@ impl LightClient {
+     /// `sync_handle` field.
+     // TODO: add realtime sync updates to zingo-cli when it can handle printing during user input
+     pub async fn sync(&mut self) -> Result<(), LightClientError> {
++        if self.chain_type() == crate::config::ChainType::CustomTestnet {
++            self.verify_network().await?;
++        }
+         if self.sync_mode() != SyncMode::NotRunning {
+             return Err(LightClientError::SyncModeError(
+                 SyncModeError::SyncAlreadyRunning,
+diff --git a/zingolib/src/wallet/disk.rs b/zingolib/src/wallet/disk.rs
+index 32a87dca..93b00833 100644
+--- a/zingolib/src/wallet/disk.rs
++++ b/zingolib/src/wallet/disk.rs
+@@ -46,6 +46,9 @@ use pepper_sync::{
+ /// the optional Orchard→Ironwood migration section.
+ type WalletTail = (PriceList, Option<crate::wallet::migration::MigrationState>);
+ 
++// This tag identifies the fixed genesis and activation schedule in config.rs.
++const PRIVACY_TESTNET_TAG: u8 = 3;
++
+ enum V40ChainField {
+     Tag(u8),
+     Name(String),
+@@ -71,6 +74,7 @@ fn chain_type_from_tag(tag: u8) -> io::Result<ChainType> {
+         0 => Ok(ChainType::Mainnet),
+         1 => Ok(ChainType::Testnet),
+         2 => Ok(ChainType::Regtest(ActivationHeights::default())),
++        PRIVACY_TESTNET_TAG => Ok(ChainType::CustomTestnet),
+         other => Err(Error::new(
+             ErrorKind::InvalidData,
+             format!("invalid chain type index stored in wallet file: {}", other,),
+@@ -83,6 +87,7 @@ fn chain_name_from_stored(stored: &str) -> io::Result<&'static str> {
+         "main" => Ok("mainnet"),
+         "test" => Ok("testnet"),
+         "regtest" => Ok("regtest"),
++        crate::config::PRIVACY_TESTNET_NAME => Ok(crate::config::PRIVACY_TESTNET_NAME),
+         other => Err(Error::new(
+             ErrorKind::InvalidData,
+             format!("invalid chain type stored in wallet file: {}", other,),
+@@ -180,6 +185,7 @@ impl LightWallet {
+             ChainType::Mainnet => 0,
+             ChainType::Testnet => 1,
+             ChainType::Regtest(_) => 2,
++            ChainType::CustomTestnet => PRIVACY_TESTNET_TAG,
+         })?;
+         let seed_bytes = match &self.mnemonic {
+             Some(m) => m.clone().into_entropy(),

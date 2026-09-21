@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/zingolabs/zingolib",
+  "baseRevision": "7a542ce4a6b14d83bd0108ff3e6c5d8d4c8c71a8",
+  "patchSha256": "d90a06b55949f80f55c5e9e3ff318e5e9081a25d14cee52c019cea5434e0edb0",
+  "status": "Draft integration snapshot; full SDK feature and benchmark gates are not complete",
+  "verified": [
+    "6 focused tests",
+    "live project indexer identity and sync",
+    "reject other network"
+  ],
+  "genesis": "01d6e85dd3c1c128941a849c5025cd2e437258811a2551b82aefd68686c982e1"
+}

@@ -184,13 +184,13 @@ const Send: React.FC<SendProps> = ({ sendTransaction, setSendPageState, addAddre
       Utils.splitZecAmountIntoBigSmall(unconfirmed);
 
     if (unconfirmed > 0) {
-      _tooltip = `Waiting for confirmation of ZEC ${bigPart + smallPart} with 3 block (approx 5 minutes)`;
+      _tooltip = `Waiting for confirmation of ${info.currencyName} ${bigPart + smallPart} with 3 blocks`;
     }
     if (unconfirmed === 0 && pending > 0) {
-      _tooltip = `Waiting for confirmation with 3 block (approx 5 minutes)`;
+      _tooltip = `Waiting for confirmation with 3 blocks`;
     }
     setTooltip(_tooltip);
-  }, [addressesUnified, totalBalance, valueTransfers]);
+  }, [addressesUnified, totalBalance, valueTransfers, info.currencyName]);
 
   // Asked about the first recipient whose address the wallet recognises: what
   // can be sent depends on where it goes, since a transparent destination

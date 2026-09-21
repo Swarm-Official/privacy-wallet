@@ -100,6 +100,12 @@ test("never asks the registry about regtest", async () => {
   expect(invoke).not.toHaveBeenCalled();
 });
 
+test("keeps the project's testnet separate from the public server registry", async () => {
+  respondWith([server("public-zcash.example")]);
+  expect(await fetchServerList(ServerChainNameEnum.privacyTestnetChainName)).toEqual([]);
+  expect(invoke).not.toHaveBeenCalled();
+});
+
 // Each of these has to leave the caller on the static list rather than with a
 // half-built one, so they all resolve empty instead of throwing.
 test("gives an empty list when the registry is unreachable", async () => {

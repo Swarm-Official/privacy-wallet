@@ -303,7 +303,7 @@ const SendConfirmModal: React.FC<SendConfirmModalProps> = ({
           resultJSON.status &&
           resultJSON.status === "success" &&
           resultJSON.chain_name &&
-          resultJSON.chain_name === currChain
+          Utils.sameAddressNetwork(resultJSON.chain_name, currChain)
         )
       ) {
         return "-";

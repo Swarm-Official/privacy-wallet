@@ -335,6 +335,18 @@ describe("Dashboard", () => {
   describe("the mixnet-only price notice", () => {
     const NOTICE = /ZEC price travels over the Nym mixnet only/;
 
+    it("does not imply the project test coin has a fiat price", () => {
+      render(<Dashboard navigateToHistory={jest.fn()} />, {
+        contextOverrides: {
+          currentWallet: makeWallet(ServerChainNameEnum.privacyTestnetChainName),
+          info: makeInfo({ chainName: ServerChainNameEnum.privacyTestnetChainName, currencyName: "TEST" }),
+          mixnetView: deriveMixnetView({ mode: "switched_off" }),
+        },
+      });
+      expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+      expect(screen.queryByText(/ZEC Price/)).not.toBeInTheDocument();
+    });
+
     const showWith = (view: MixnetView) =>
       render(<Dashboard navigateToHistory={jest.fn()} />, {
         contextOverrides: { currentWallet: makeWallet(), info: makeInfo(), mixnetView: view },
