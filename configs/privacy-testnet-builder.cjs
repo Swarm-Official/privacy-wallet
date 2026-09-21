@@ -19,6 +19,11 @@ module.exports = {
     azureSignOptions: null,
     signAndEditExecutable: false,
     signExts: [],
-    protocols: null,
+    protocols: [],
+    extraResources: [
+      ...upstream.win.extraResources,
+      { from: "LICENSE", to: "licenses/Zingo-PC-LICENSE.txt" },
+      { from: "vendor/zingolib/LICENSE", to: "licenses/Zingolib-LICENSE.txt" },
+    ],
   },
 };

@@ -11,7 +11,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 180
     env:
-      CARGO_BUILD_JOBS: "2"
+      CARGO_BUILD_JOBS: "4"
       CARGO_PROFILE_RELEASE_DEBUG: "0"
       CARGO_PROFILE_RELEASE_LTO: "false"
       CARGO_INCREMENTAL: "0"
@@ -33,6 +33,17 @@ jobs:
         with:
           node-version: "24"
           cache: yarn
+      - name: Restore compiled Rust outputs
+        id: rust-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/target
+            vendor/zingolib/zingo-netutils/target
+          key: privacy-windows-rust196-nu63-${{ hashFiles('native/Cargo.lock', 'native/src/lib.rs', 'patches/privacy-sdk-v2.patch') }}
+          restore-keys: privacy-windows-rust196-nu63-
       - name: Install build prerequisites
         shell: pwsh
         run: |
@@ -42,6 +53,8 @@ jobs:
           npm install --global yarn@1.22.22
       - name: Install locked JavaScript dependencies
         run: yarn install --frozen-lockfile
+      - name: Validate the complete Windows packaging configuration
+        run: node scripts/check-privacy-package-config.js
       - name: Verify and apply the SDK integration snapshot
         run: node scripts/prepare-privacy-sdk.js
       - name: Generate the empty optional swap configuration
@@ -56,6 +69,16 @@ jobs:
         run: git diff --exit-code -- native/Cargo.lock
       - name: Build the matching upstream transport helper
         run: node scripts/stage-nym-proxy.js --strict-rev --target x86_64-pc-windows-msvc
+      - name: Save successful Rust outputs before packaging
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/target
+            vendor/zingolib/zingo-netutils/target
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}
       - name: Build the desktop frontend
         run: yarn script:build
         env:
@@ -64,6 +87,22 @@ jobs:
         run: node scripts/stage-vcruntime.js --arch x64
       - name: Verify binary architecture
         run: node scripts/check-win-arch.js --arch x64
+      - name: Record compiled input provenance
+        run: git rev-parse HEAD | Set-Content compile-source-commit.txt
+      - name: Preserve compiled app inputs before packaging
+        uses: actions/upload-artifact@v4
+        with:
+          name: privacy-wallet-windows-compiled-inputs
+          path: |
+            build/
+            src/native.node
+            resources/nym-proxy.exe
+            resources/vcruntime/
+            node_modules/keytar/build/Release/keytar.node
+            native/Cargo.lock
+            patches/privacy-sdk-v2.json
+            compile-source-commit.txt
+          retention-days: 7
       - name: Package the unsigned test wallet
         run: yarn electron-builder --win zip --x64 --config configs/privacy-testnet-builder.cjs --publish never
       - name: Record build provenance and checksums
