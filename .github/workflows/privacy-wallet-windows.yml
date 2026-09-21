@@ -18,6 +18,7 @@ jobs:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       RUSTUP_TOOLCHAIN: "1.96.0"
+      RUSTFLAGS: '--cfg zcash_unstable="nu6.3"'
       ZINGOLIB_PATH: ${{ github.workspace }}/vendor/zingolib
       CI: "true"
     steps:
