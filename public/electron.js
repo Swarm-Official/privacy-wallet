@@ -2873,7 +2873,7 @@ app.whenReady().then(async () => {
   // - Windows/Linux packaged: the installer registers it, but calling this too doesn't hurt.
   // - Dev mode on any platform: needed because electron-builder hasn't run.
   const isInSandbox = process.mas || !!process.env.FLATPAK_ID;
-  if (!isInSandbox) {
+  if (!isInSandbox && !isPrivacyTestnetBuild) {
     if (process.defaultApp) {
       // Dev mode on Windows/Linux: register so URIs reach this instance via second-instance.
       // Skipped on macOS: cold-start doesn't work in dev anyway, and registering here would
@@ -2904,7 +2904,9 @@ app.whenReady().then(async () => {
   // LoadingScreen asks, the request has usually already landed, so `auto` costs
   // the launch nothing. Testnet is fetched on demand — far rarer, and no reason
   // to spend a second clearnet request on every launch.
-  serverRegistry.load("main");
+  if (settings.getSync("all.serverchain_name") !== "privacy-testnet") {
+    serverRegistry.load("main");
+  }
 
   if (isDev) {
     try {
