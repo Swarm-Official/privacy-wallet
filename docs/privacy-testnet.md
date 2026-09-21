@@ -14,6 +14,8 @@ Upgrade activations through NU6.3 are at height 1. The wallet's birthday floor i
 
 The custom profile does not fetch a public server list, select a public fallback, value balances using ZEC pricing, or open public Zcash explorers. Supply an appropriate custom explorer explicitly. Mixnet routing is disabled for this profile until that transport supports a verified private-chain destination; transactions use the selected indexer connection. Public Zcash network profiles retain their existing behavior.
 
+If you stop or restart your node, open the project wallet launcher again. It starts the node if needed and restarts its own indexer when the node's RPC authentication cookie changes, preserving node and wallet files. An already open wallet window is reused. If that window was deliberately put in Offline Mode, reconnect from its server settings.
+
 ## Files and authentication
 
 The project launcher sets `PRIVACY_WALLET_DIR` to a dedicated folder under `D:\privacy\.runtime\apps\wallet-testnet`. Without that override, the SDK uses its separate `privacy-testnet` wallet directory. The launcher also supplies a dedicated Electron profile directory. Preserve wallet data and backups when updating the application.
