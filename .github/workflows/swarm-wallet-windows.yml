@@ -1,15 +1,16 @@
 name: SWARM wallet Windows test build
 
+# Two ways in, because `workflow_dispatch` only fires for workflows that are
+# on the repository's default branch, and this one lives on `swarm-wallet`
+# while the default is still the Privacy Testnet branch. Pushing a
+# `swarm-build-*` tag starts exactly one run from exactly that commit, which
+# is what a build of a specific tree should be anyway. The dispatch trigger is
+# kept for the day this branch becomes the default.
 on:
   workflow_dispatch:
-    inputs:
-      release:
-        description: >-
-          Refuse to build unless the pinned SDK carries a real SwarmTestnet
-          genesis hash. Leave this off while the network's genesis block does
-          not exist yet: every build until then is a development build.
-        type: boolean
-        default: false
+  push:
+    tags:
+      - "swarm-build-*"
 
 permissions:
   contents: read
@@ -67,8 +68,13 @@ jobs:
         run: node scripts/check-swarm-package-config.js
       # Everything cheap that can refuse the build runs before the hour of
       # compilation, not after it.
+      # `--require-real-genesis` is unconditional now. It existed to stop a
+      # build shipping the SDK's genesis placeholder while SwarmTestnet had no
+      # genesis block; the network has one, so every build from here must
+      # carry it and there is no longer a reason to let that gate be switched
+      # off by whoever presses the button.
       - name: Verify the pinned SDK revision and its network
-        run: node scripts/check-swarm-sdk-pin.js sdk-source ${{ inputs.release && '--require-real-genesis' || '' }}
+        run: node scripts/check-swarm-sdk-pin.js sdk-source --require-real-genesis
       - name: Check the lockfile resolves without changes
         run: cargo fetch --locked --manifest-path native/Cargo.toml
       - name: Generate the empty optional swap configuration
