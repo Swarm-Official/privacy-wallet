@@ -7,8 +7,8 @@ const upstream = require("../package.json").build;
 // `executableName` does not, so the file on disk, the process name the
 // launcher looks for and the window's own title stay easy to quote.
 //
-// The icon is the placeholder in resources/swarm — see scripts/make-swarm-icon.js.
-// Replacing the logo means replacing those two files and nothing else.
+// The icon is the style guide's hive bee, rendered by scripts/make-swarm-icon.js
+// into resources/swarm. Changing the mark means re-running that script.
 module.exports = {
   ...upstream,
   productName: "SWARM Wallet (Testnet)",

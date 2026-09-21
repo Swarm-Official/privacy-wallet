@@ -1,6 +1,6 @@
 # SWARM Wallet (Testnet)
 
-This fork keeps Zingo PC's desktop application and Zingolib's wallet and cryptographic implementation unchanged. What it adds is a network profile: `swarm-testnet`, the SwarmTestnet chain, which uses standard Zcash testnet address encodings and an explicitly pinned genesis. It is not the public Zcash testnet, and its coins — shown as `SWARM` — have no market value and no fiat price.
+This fork keeps Zingo PC's desktop application and Zingolib's wallet and cryptographic implementation unchanged. What it adds is a network profile: `swarm-testnet`, the SwarmTestnet chain, which uses standard Zcash testnet address encodings and an explicitly pinned genesis. It is not the public Zcash testnet, and its coins — shown as `SWM` — have no market value and no fiat price.
 
 ## The genesis hash does not exist yet
 
@@ -50,4 +50,4 @@ Removed with the patch mechanism: the repackage workflow and `scripts/restore-pr
 
 ## Icon
 
-`resources/swarm/icon.png` and `resources/swarm/icon.ico` are a placeholder, rendered by `scripts/make-swarm-icon.js` from the hex-bee mark in the website's `assets/logo-mark.svg`. The owner has not chosen a final logo. Replacing it means replacing those two files; nothing else refers to the artwork.
+The mark is the style guide's hive bee (`Swarm Style Guide v2`, section 02): a Hive Orange hexagonal body with two stripes that take the background colour, and two honey wings. `scripts/make-swarm-icon.js` renders it — the guide's geometry unchanged — into `resources/swarm/icon.png`, `resources/swarm/icon.ico` and `src/assets/img/swarm-mark.png`. Those three files are the only artwork the wallet ships; changing the mark means re-running that script.

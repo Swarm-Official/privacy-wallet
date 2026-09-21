@@ -11,6 +11,7 @@ import {
   SyncStatusScanRangePriorityEnum,
 } from "../appstate";
 import routes from "../../constants/routes.json";
+import { SWARM_TICKER } from "../../utils/swarmNetwork";
 import { deriveMixnetView, MixnetView, UNKNOWN_MIXNET_VIEW } from "../../rpc/components/mixnetPresenter";
 
 jest.mock("../../electronBridge");
@@ -339,7 +340,7 @@ describe("Dashboard", () => {
       render(<Dashboard navigateToHistory={jest.fn()} />, {
         contextOverrides: {
           currentWallet: makeWallet(ServerChainNameEnum.swarmTestnetChainName),
-          info: makeInfo({ chainName: ServerChainNameEnum.swarmTestnetChainName, currencyName: "SWARM" }),
+          info: makeInfo({ chainName: ServerChainNameEnum.swarmTestnetChainName, currencyName: SWARM_TICKER }),
           mixnetView: deriveMixnetView({ mode: "switched_off" }),
         },
       });

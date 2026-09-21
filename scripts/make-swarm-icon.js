@@ -1,15 +1,20 @@
-// Draws the placeholder SWARM application icon.
+// Draws the SWARM application icon: the style guide's hive bee.
 //
-// The owner has not chosen a final logo. This renders the hex-bee mark from
-// the website's assets/logo-mark.svg — the same geometry, the same colours —
-// into resources/swarm/icon.png and resources/swarm/icon.ico, which are the
-// only two files the packaged wallet's icon comes from. Replacing the logo
-// later means replacing those two files (or re-running this script against a
-// new set of shapes); nothing else refers to the artwork.
+// The mark is defined in D:\privacy\Style guide\Swarm Style Guide v2.dc.html,
+// section 02: a hexagonal body — one cell of the hive — in Hive Orange, two
+// stripes that take the background colour, and two honey elliptical wings.
+// The geometry here is that SVG's, unchanged. The icon uses the guide's
+// "full-colour on dark" variant on a warm-black rounded tile, which is what
+// the guide itself shows an app icon as, and keeps the stripes readable
+// against whatever the desktop puts behind it.
+//
+// Outputs are resources/swarm/icon.png, resources/swarm/icon.ico and
+// src/assets/img/swarm-mark.png. Those three files are the only artwork the
+// wallet ships; changing the mark means re-running this script.
 //
 // It is written by hand because this machine has no SVG rasteriser and none
-// may be installed. The shapes are all polygons, so a scanline fill with 4x4
-// supersampling is enough, and zlib plus a CRC are enough to write a PNG.
+// may be installed. The shapes are polygons and ellipses, so a scanline fill
+// with 4x4 supersampling is enough, and zlib plus a CRC are enough for a PNG.
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
@@ -21,10 +26,9 @@ const CANVAS = SIZE * SUPERSAMPLE;
 const VIEWBOX = 64;
 const SCALE = CANVAS / VIEWBOX;
 
-const HONEY = [0xf5, 0xa6, 0x23];
-const WING = [0xff, 0xc9, 0x4d];
-const STINGER = [0xe8, 0x89, 0x0c];
-const STRIPE = [0x0e, 0x11, 0x16];
+const HIVE_ORANGE = [0xff, 0x8a, 0x1f];
+const HONEY = [0xff, 0xb0, 0x20];
+const WARM_BLACK = [0x0a, 0x09, 0x08];
 
 const rotate = (points, degrees, cx, cy) => {
   const radians = (degrees * Math.PI) / 180;
@@ -42,48 +46,55 @@ const rect = (x, y, width, height) => [
   [x, y + height],
 ];
 
-// Every shape in the mark, in the order the SVG paints them.
+// An ellipse as a polygon, fine enough that its edge is smooth once the
+// canvas is downsampled. `rx`, `ry` and the rotation are the SVG's.
+const ellipse = (cx, cy, rx, ry, degrees) => {
+  const STEPS = 96;
+  return rotate(
+    Array.from({ length: STEPS }, (_, i) => {
+      const angle = (i / STEPS) * 2 * Math.PI;
+      return [cx + rx * Math.cos(angle), cy + ry * Math.sin(angle)];
+    }),
+    degrees,
+    cx,
+    cy,
+  );
+};
+
+// A rounded square the mark sits on, so the stripes — which take the
+// background colour — stay legible on any desktop wallpaper.
+const roundedTile = (radius) => {
+  const STEPS = 24;
+  const [lo, hi] = [0, VIEWBOX];
+  const corner = (cx, cy, from) =>
+    Array.from({ length: STEPS + 1 }, (_, i) => {
+      const angle = from + (i / STEPS) * (Math.PI / 2);
+      return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
+    });
+  return [
+    ...corner(hi - radius, hi - radius, 0),
+    ...corner(lo + radius, hi - radius, Math.PI / 2),
+    ...corner(lo + radius, lo + radius, Math.PI),
+    ...corner(hi - radius, lo + radius, (3 * Math.PI) / 2),
+  ];
+};
+
+// The mark, in the order the style guide's SVG paints it.
 const BODY = [
-  [32, 15.5],
-  [45.856, 23.5],
-  [45.856, 39.5],
-  [32, 47.5],
-  [18.144, 39.5],
-  [18.144, 23.5],
+  [32, 22],
+  [46, 30],
+  [46, 48],
+  [32, 56],
+  [18, 48],
+  [18, 30],
 ];
-const LEFT_WING = rotate(
-  [
-    [16.6, 12.8],
-    [24.221, 17.2],
-    [24.221, 26],
-    [16.6, 30.4],
-    [8.979, 26],
-    [8.979, 17.2],
-  ],
-  -20,
-  16.6,
-  21.6,
-);
-const RIGHT_WING = rotate(
-  [
-    [47.4, 12.8],
-    [55.021, 17.2],
-    [55.021, 26],
-    [47.4, 30.4],
-    [39.779, 26],
-    [39.779, 17.2],
-  ],
-  20,
-  47.4,
-  21.6,
-);
 const SHAPES = [
-  { points: [[28.8, 44], [35.2, 44], [32, 51.3]], color: STINGER, alpha: 1, clip: null },
-  { points: LEFT_WING, color: WING, alpha: 0.92, clip: null },
-  { points: RIGHT_WING, color: WING, alpha: 0.92, clip: null },
-  { points: BODY, color: HONEY, alpha: 1, clip: null },
-  { points: rect(16, 21.5, 32, 4.4), color: STRIPE, alpha: 1, clip: BODY },
-  { points: rect(16, 34.1, 32, 4.4), color: STRIPE, alpha: 1, clip: BODY },
+  { points: roundedTile(13), color: WARM_BLACK, alpha: 1, clip: null },
+  { points: ellipse(21, 17, 12, 6.5, -28), color: HONEY, alpha: 1, clip: null },
+  { points: ellipse(43, 17, 12, 6.5, 28), color: HONEY, alpha: 1, clip: null },
+  { points: BODY, color: HIVE_ORANGE, alpha: 1, clip: null },
+  { points: rect(18, 35, 28, 4), color: WARM_BLACK, alpha: 1, clip: BODY },
+  { points: rect(18, 44, 28, 4), color: WARM_BLACK, alpha: 1, clip: BODY },
 ];
 
 /** Whether (x, y) is inside a polygon, by the even-odd rule. */
@@ -214,6 +225,6 @@ fs.writeFileSync(path.join(directory, "icon.ico"), Buffer.concat([ico, png]));
 // The same mark inside the application, beside the version string.
 fs.writeFileSync(path.resolve(__dirname, "../src/assets/img/swarm-mark.png"), png);
 console.log(
-  `Wrote the placeholder SWARM mark (${SIZE}x${SIZE}) to resources/swarm/icon.png, ` +
+  `Wrote the SWARM hive-bee mark (${SIZE}x${SIZE}) to resources/swarm/icon.png, ` +
     "resources/swarm/icon.ico and src/assets/img/swarm-mark.png.",
 );

@@ -30,8 +30,11 @@ export const SWARM_CHAIN: ServerChainNameEnum = ServerChainNameEnum.swarmTestnet
 /** What the network is called on screen. */
 export const SWARM_NETWORK_LABEL = "SWARM Testnet";
 
-/** The coin these test balances are counted in. Test coins, no fiat price. */
-export const SWARM_TICKER = "SWARM";
+/**
+ * The coin these balances are counted in — the ticker, not the project name.
+ * Test coins: there is no market and no fiat price for them.
+ */
+export const SWARM_TICKER = "SWM";
 
 export type SwarmServerPreset = {
   readonly label: string;
