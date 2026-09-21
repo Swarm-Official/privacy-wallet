@@ -28,7 +28,13 @@ module.exports = {
     icon: "./resources/swarm/icon.ico",
     target: ["zip"],
     azureSignOptions: null,
-    signAndEditExecutable: false,
+    // True so electron-builder rewrites the executable's version resource —
+    // without it the file's Properties dialog keeps Electron's own
+    // ProductName and FileDescription, which is what it did on build
+    // ec77dc96. Editing the resource is rcedit's job and pulls in no signing:
+    // `signExts: []` and the null Azure options are what keep the signing
+    // pipeline out, and CSC_IDENTITY_AUTO_DISCOVERY is false in the workflow.
+    signAndEditExecutable: true,
     signExts: [],
     // No `zcash:` handler: this wallet is not for the public Zcash network and
     // must not become the machine's default for its payment links.

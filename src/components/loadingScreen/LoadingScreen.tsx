@@ -107,7 +107,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       const { openErrorModal, closeErrorModal } = this.context as React.ContextType<typeof ContextApp>;
       closeErrorModal();
       openErrorModal(
-        "Zingo PC is taking too long to start",
+        "SWARM Wallet is taking too long to start",
         <div>
           <div>Startup stopped responding at: {this.state.step}</div>
           <div className={cstyles.margintoplarge}>
@@ -143,7 +143,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       console.error(`Critical Error first time setup ${error}`);
       closeErrorModal();
       openErrorModal(
-        "Zingo PC could not start",
+        "SWARM Wallet could not start",
         <div>
           <div>Something failed while preparing the wallet, and the app cannot continue.</div>
           {/* The wallet's own words, not the four layers of IPC around them.

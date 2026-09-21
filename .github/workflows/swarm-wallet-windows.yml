@@ -103,6 +103,12 @@ jobs:
         run: yarn script:build
         env:
           CI: ""
+      # Build ec77dc96 shipped an unlock screen reading "Zingo PC is locked"
+      # under a window titled "SWARM Wallet (Testnet)". Every check that ran
+      # looked at package metadata and passed; the wrong string was inside a
+      # renderer chunk. This reads the chunks.
+      - name: Check the renderer shows no upstream naming
+        run: node scripts/check-swarm-bundle-strings.js --renderer build/static/js
       - name: Stage the Windows runtime
         run: node scripts/stage-vcruntime.js --arch x64
       - name: Verify binary architecture
@@ -126,6 +132,8 @@ jobs:
           retention-days: 7
       - name: Package the unsigned test wallet
         run: yarn electron-builder --win zip --x64 --config configs/swarm-testnet-builder.cjs --publish never
+      - name: Check the packaged application shows no upstream naming
+        run: node scripts/check-swarm-bundle-strings.js --asar dist/win-unpacked --renderer build/static/js
       - name: Record build provenance and checksums
         shell: pwsh
         run: |

@@ -53,7 +53,7 @@ function fileNamePart(text: string, maxChars: number = Infinity): string {
  */
 export function qrFileName(kind: string, walletAlias?: string, title?: string): string {
   const parts = [
-    `QR_${kind}_Zingo_PC`,
+    `QR_${kind}_SWARM_Wallet`,
     fileNamePart(walletAlias ?? ""),
     fileNamePart(title ?? "", FILE_NAME_TITLE_MAX_CHARS),
   ];

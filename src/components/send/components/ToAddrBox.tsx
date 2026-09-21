@@ -4,6 +4,7 @@ import styles from "../Send.module.css";
 import cstyles from "../../common/Common.module.css";
 import { AddressBookEntryClass, AddressKindEnum, ServerChainNameEnum, ToAddrClass } from "../../appstate";
 import Utils from "../../../utils/utils";
+import { chainLabelForCurrency } from "../../../utils/swarmNetwork";
 import ArrowUpLight from "../../../assets/img/arrow_up_dark.png";
 import { ContextApp } from "../../../context/ContextAppState";
 import { isSameZnsAlias, isZnsAlias, extractZnsName, resolveZnsAlias } from "../../../utils/zns";
@@ -117,7 +118,7 @@ const ToAddrBox = ({
   const [scanOpen, setScanOpen] = useState<boolean>(false);
   // Named once: the contact list and the save prompt should call the chain the
   // same thing on the same screen.
-  const zcashChainLabel = currencyName === "TAZ" ? "Testnet Zcash" : "Zcash";
+  const zcashChainLabel = chainLabelForCurrency(currencyName);
 
   // Zcash contacts only. The address book holds swap contacts too, and those
   // carry this same `chain` — swaps are mainnet-only, so a Bitcoin address is

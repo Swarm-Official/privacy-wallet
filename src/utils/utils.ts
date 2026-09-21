@@ -299,20 +299,26 @@ export default class Utils {
     return Utils.nextToAddrID++;
   }
 
-  static getDonationAddress(testnet: boolean): string {
-    if (testnet) {
-      return "";
-    } else {
-      return "";
-    }
+  /**
+   * The donation feature upstream shipped is not wired up in this fork, and
+   * these three are what is left of it: nothing in the interface calls them.
+   *
+   * They are kept, and emptied, rather than deleted. An empty address cannot
+   * become a payment; a zero amount cannot prefill one; and the memo no longer
+   * asks a SWARM user to thank a different project. If a donation flow is ever
+   * built for this network it starts from a blank here rather than inheriting
+   * somebody else's recipient by accident.
+   */
+  static getDonationAddress(_testnet: boolean): string {
+    return "";
   }
 
-  static getDefaultDonationAmount(testnet: boolean): number {
-    return 0.1;
+  static getDefaultDonationAmount(_testnet: boolean): number {
+    return 0;
   }
 
-  static getDefaultDonationMemo(testnet: boolean): string {
-    return "Thanks for supporting Zingo!";
+  static getDefaultDonationMemo(_testnet: boolean): string {
+    return "";
   }
 
   static getZecToUsdString(price?: number, zecValue?: number): string {

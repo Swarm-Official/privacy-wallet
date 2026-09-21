@@ -372,19 +372,24 @@ describe("VTTypeWithConfirmations", () => {
 // ---------------------------------------------------------------------------
 // getDefaultDonationAmount / getDefaultDonationMemo
 // ---------------------------------------------------------------------------
-describe("getDefaultDonationAmount", () => {
-  it("returns 0.1 for mainnet", () => {
-    expect(Utils.getDefaultDonationAmount(false)).toBe(0.1);
+// Upstream's donation feature is not wired up in this fork, and what is left
+// of it is emptied rather than inherited: an empty address cannot become a
+// payment, a zero amount cannot prefill one, and the memo no longer asks a
+// SWARM user to thank a different project.
+describe("the donation defaults left over from upstream", () => {
+  it("names no recipient, on either network", () => {
+    expect(Utils.getDonationAddress(false)).toBe("");
+    expect(Utils.getDonationAddress(true)).toBe("");
   });
 
-  it("returns 0.1 for testnet", () => {
-    expect(Utils.getDefaultDonationAmount(true)).toBe(0.1);
+  it("prefills no amount", () => {
+    expect(Utils.getDefaultDonationAmount(false)).toBe(0);
+    expect(Utils.getDefaultDonationAmount(true)).toBe(0);
   });
-});
 
-describe("getDefaultDonationMemo", () => {
-  it("returns the expected support memo", () => {
-    expect(Utils.getDefaultDonationMemo(false)).toBe("Thanks for supporting Zingo!");
+  it("carries no memo thanking another project", () => {
+    expect(Utils.getDefaultDonationMemo(false)).toBe("");
+    expect(Utils.getDefaultDonationMemo(true)).toBe("");
   });
 });
 

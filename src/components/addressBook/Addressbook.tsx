@@ -28,7 +28,7 @@ import { faQrcode } from "@fortawesome/free-solid-svg-icons";
 /** The refusal for an address on chains that do not swap with ZEC, naming them. */
 const unswappableMessage = (chains: string[]): string => {
   const names = Array.from(new Set(chains.map((chain) => chainDisplayName(chain) || chain)));
-  return `That is a ${names.join(" / ")} address. Zingo cannot swap it with ZEC, so it cannot be saved as a contact.`;
+  return `That is a ${names.join(" / ")} address. This wallet cannot swap it with ZEC, so it cannot be saved as a contact.`;
 };
 
 type AddressBookProps = {

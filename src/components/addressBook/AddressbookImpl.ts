@@ -13,9 +13,23 @@ const znsKey = (chain: string | undefined, alias: string): string => `${chain ??
 
 // Utility class to save / read the address book.
 export default class AddressbookImpl {
+  /**
+   * Where the address book lives: `<roaming app data>/SWARM Wallet/`.
+   *
+   * Note which path this is. It is the roaming application-data folder, not
+   * the Electron profile — so upstream's `Zingo PC` folder was shared by every
+   * build on the machine, and this wallet would have read and written the same
+   * contacts file as the Privacy Testnet wallet still installed beside it.
+   * Two wallets on two different chains have no business sharing one address
+   * book, and a SWARM build has no business writing into a folder named after
+   * the application it was forked from.
+   *
+   * The old file is left exactly where it is. Nothing is migrated: a contact
+   * saved against another chain is not a contact on this one.
+   */
   static async getFileName(): Promise<string> {
     const relativePath: string = await ipcRenderer.invoke("get-app-data-path");
-    const dir: string = path.join(relativePath, "Zingo PC");
+    const dir: string = path.join(relativePath, "SWARM Wallet");
     if (!(await fs.existsSync(dir))) {
       await fs.promises.mkdir(dir);
     }

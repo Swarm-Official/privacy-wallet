@@ -16,6 +16,7 @@ import {
   ZEC_SWAP_CHAIN,
 } from "../../appstate";
 import Utils from "../../../utils/utils";
+import { chainLabelForCurrency } from "../../../utils/swarmNetwork";
 import { ZcashURITarget } from "../../../utils/uris";
 import { ContextApp } from "../../../context/ContextAppState";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -625,7 +626,7 @@ const VtModalInternal: React.FC<VtModalInternalProps> = ({
       {saveContactOpen && !!address && (
         <SaveContact
           address={address}
-          chainLabel={currencyName === "TAZ" ? "Testnet Zcash" : "Zcash"}
+          chainLabel={chainLabelForCurrency(currencyName)}
           modalIsOpen={saveContactOpen}
           closeModal={() => setSaveContactOpen(false)}
           onSave={(name) =>

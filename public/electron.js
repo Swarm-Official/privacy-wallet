@@ -62,6 +62,13 @@ const SWARM_WINDOW_TITLE = "SWARM Wallet (Testnet)";
 // Mirrors src/utils/swarmNetwork.ts, which the renderer reads; this copy
 // exists because the main process runs before any renderer module is loaded.
 const SWARM_CHAIN_NAME = "swarm-testnet";
+
+// The project's official channels, and the only destinations this application
+// offers to open. Upstream's were ZingoLabs'; a user following a link out of
+// this wallet must not end up somewhere that has never heard of this network.
+const SWARM_SITE_URL = "https://swarm.green";
+const SWARM_SOURCE_URL = "https://github.com/brs-holding";
+const SWARM_ISSUES_URL = "https://github.com/brs-holding/privacy-wallet/issues";
 const SWARM_DEFAULT_SERVER = "https://lwd.swarm.green:443";
 
 if (isSwarmWalletBuild && !settings.getSync("all")) {
@@ -169,10 +176,10 @@ class MenuBuilder {
     const { mainWindow } = this;
 
     const subMenuAbout = {
-      label: "Zingo PC",
+      label: "SWARM Wallet",
       submenu: [
         {
-          label: "About Zingo PC",
+          label: "About SWARM Wallet",
           selector: "orderFrontStandardAboutPanel:",
           click: () => {
             mainWindow.webContents.send("about");
@@ -182,7 +189,7 @@ class MenuBuilder {
         { label: "Services", submenu: [] },
         { type: "separator" },
         {
-          label: "Hide Zingo PC",
+          label: "Hide SWARM Wallet",
           accelerator: "Command+H",
           selector: "hide:",
         },
@@ -335,16 +342,22 @@ class MenuBuilder {
         {
           // The App Store build updates through the App Store, and pointing at
           // another channel is what guideline 2.4.5(vii) forbids.
-          label: "Check github.com for updates",
+          label: "SWARM source code",
           visible: process.mas !== true,
           click() {
-            shell.openExternal("https://github.com/zingolabs/zingo-pc");
+            shell.openExternal(SWARM_SOURCE_URL);
           },
         },
         {
-          label: "File a bug...",
+          label: "swarm.green",
           click() {
-            shell.openExternal("https://github.com/zingolabs/zingo-pc/issues");
+            shell.openExternal(SWARM_SITE_URL);
+          },
+        },
+        {
+          label: "Report a problem...",
+          click() {
+            shell.openExternal(SWARM_ISSUES_URL);
           },
         },
       ],
@@ -464,21 +477,27 @@ class MenuBuilder {
         label: "Help",
         submenu: [
           {
-            label: "About Zingo PC",
+            label: "About SWARM Wallet",
             click: () => {
               mainWindow.webContents.send("about");
             },
           },
           {
-            label: "Check github.com for updates",
+            label: "SWARM source code",
             click() {
-              shell.openExternal("https://github.com/zingolabs/zingo-pc/releases");
+              shell.openExternal(SWARM_SOURCE_URL);
             },
           },
           {
-            label: "File a bug...",
+            label: "swarm.green",
             click() {
-              shell.openExternal("https://github.com/zingolabs/zingo-pc/issues");
+              shell.openExternal(SWARM_SITE_URL);
+            },
+          },
+          {
+            label: "Report a problem...",
+            click() {
+              shell.openExternal(SWARM_ISSUES_URL);
             },
           },
         ],
@@ -556,7 +575,7 @@ async function withWriteRetries(what, attempt) {
         throw new Error(
           `${what} could not be saved: Windows would not replace the file (${code}). ` +
             "Something is holding it open — antivirus, a folder-syncing client, or another " +
-            "copy of Zingo PC still running. Close any other Zingo PC window and try again.",
+            "copy of SWARM Wallet still running. Close any other SWARM Wallet window and try again.",
         );
       }
       console.log(`[storage] ${what}: ${code}, retrying in ${wait}ms`);
@@ -1963,9 +1982,9 @@ ipcMain.handle("wallet-dir:request", async () => {
       const { response } = await dialog.showMessageBox(mainWindow, {
         type: "info",
         title: "Wallet folder access",
-        message: "Zingo needs access to the wallet folder",
+        message: "SWARM Wallet needs access to the wallet folder",
         detail: `Your wallets are stored in:\n${zcashDir}\n\nIn the next screen, select that folder and click "Confirm".`,
-        buttons: ["Continue", "Quit Zingo"],
+        buttons: ["Continue", "Quit"],
         defaultId: 0,
         cancelId: 1,
       });
@@ -1988,8 +2007,8 @@ ipcMain.handle("wallet-dir:request", async () => {
         const { response: r2 } = await dialog.showMessageBox(mainWindow, {
           type: "warning",
           title: "Access required",
-          message: "Zingo cannot run without access to the wallet folder.",
-          buttons: ["Retry", "Quit Zingo"],
+          message: "SWARM Wallet cannot run without access to the wallet folder.",
+          buttons: ["Retry", "Quit"],
           defaultId: 0,
           cancelId: 1,
         });
@@ -2072,7 +2091,7 @@ ipcMain.handle("wallet-dir:request", async () => {
           await dialog.showMessageBox(mainWindow, {
             type: "error",
             title: "Could not access the folder",
-            message: `Zingo could not get access to "${finalPath}".`,
+            message: `SWARM Wallet could not get access to "${finalPath}".`,
             detail: "Select the folder again, or pick a different one.",
             buttons: ["Retry"],
           });
@@ -2563,7 +2582,7 @@ function createWindow() {
         title: "Security Warning",
         message: "Chromium sandbox is disabled",
         detail:
-          "Zingo PC is running without the Chromium process sandbox because your system " +
+          "SWARM Wallet is running without the Chromium process sandbox because your system " +
           "has user namespaces disabled (unprivileged_userns_clone=0).\n\n" +
           "This reduces the security isolation of the application. " +
           "For full security, install the .deb package instead of the AppImage — " +

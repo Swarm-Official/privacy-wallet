@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import cstyles from "../common/Common.module.css";
 import APP_VERSION from "../../version";
+import { SWARM_APP_NAME } from "../../utils/swarmNetwork";
 import { faLock } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -18,7 +19,9 @@ const LockScreen: React.FC<Props> = ({ onUnlock }) => {
     setLoading(true);
     setError("");
     try {
-      const result: { success: boolean } = await ipcRenderer.invoke("auth:verify", "Unlock Zingo PC");
+      // This reason is what Windows Hello puts in front of the user, so it
+      // has to name the application they are actually unlocking.
+      const result: { success: boolean } = await ipcRenderer.invoke("auth:verify", `Unlock ${SWARM_APP_NAME}`);
       if (result.success) {
         onUnlock();
       } else {
@@ -45,7 +48,7 @@ const LockScreen: React.FC<Props> = ({ onUnlock }) => {
       }}
     >
       <FontAwesomeIcon icon={faLock} style={{ fontSize: 48, marginBottom: 24, opacity: 0.7 }} />
-      <div className={`${cstyles.large} ${cstyles.center} ${cstyles.margintopsmall}`}>Zingo PC is locked</div>
+      <div className={`${cstyles.large} ${cstyles.center} ${cstyles.margintopsmall}`}>{SWARM_APP_NAME} is locked</div>
       <div className={`${cstyles.sublight} ${cstyles.center}`} style={{ opacity: 0.5, marginTop: 4 }}>
         v{APP_VERSION}
       </div>

@@ -10,7 +10,7 @@ import { ContextApp } from "../../context/ContextAppState";
 import { MixnetView } from "../../rpc/components/mixnetPresenter";
 import MixnetModal from "./components/MixnetModal";
 import { Logo } from "../logo";
-import APP_VERSION from "../../version";
+import APP_VERSION, { UPSTREAM_VERSION } from "../../version";
 import { ServerChainNameEnum, WalletType } from "../appstate";
 import BlockExplorerModal from "./components/BlockExplorerModal";
 import { useCopy } from "../common/useCopy";
@@ -338,7 +338,9 @@ const Sidebar: React.FC<SidebarProps> = ({ doRescan }) => {
           <div className={cstyles.margintoplarge}>
             {SWARM_APP_NAME} v{APP_VERSION}
           </div>
-          <div className={cstyles.margintoplarge}>Based on Zingo PC by ZingoLabs, under the licence below.</div>
+          <div className={cstyles.margintoplarge}>
+            Based on Zingo PC {UPSTREAM_VERSION} by ZingoLabs, under the MIT licence below.
+          </div>
           <div className={cstyles.margintoplarge}>Built with Electron. Copyright (c) 2026, ZingoLabs.</div>
           <div className={cstyles.margintoplarge}>
             The MIT License (MIT) Copyright (c) 2026 ZingoLabs

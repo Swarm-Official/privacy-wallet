@@ -568,7 +568,7 @@ describe("AddressBook — chains that do not swap with ZEC", () => {
     fireEvent.change(screen.getByRole("textbox", { name: /address/i }), { target: { value: "1polkadotaddr" } });
     expect(
       await screen.findByText(
-        "That is a Polkadot address. Zingo cannot swap it with ZEC, so it cannot be saved as a contact.",
+        "That is a Polkadot address. This wallet cannot swap it with ZEC, so it cannot be saved as a contact.",
       ),
     ).toBeInTheDocument();
   });

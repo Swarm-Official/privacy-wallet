@@ -83,6 +83,19 @@ export const SWARM_NO_AUTOMATIC_REASON =
 /** Whether `chain` is the project chain. */
 export const isSwarmChain = (chain: ServerChainNameEnum | "" | undefined): boolean => chain === SWARM_CHAIN;
 
+/**
+ * What to call the chain on a screen that names it — the address book's
+ * heading, the save-a-contact field.
+ *
+ * These screens have only the ticker to go on, and upstream's answer was
+ * "Zcash" for anything that was not public testnet. On this network that is
+ * simply wrong: a SWM balance is not Zcash.
+ */
+export const chainLabelForCurrency = (currencyName: string): string => {
+  if (currencyName === SWARM_TICKER) return SWARM_NETWORK_LABEL;
+  return currencyName === "TAZ" ? "Testnet Zcash" : "Zcash";
+};
+
 /** The preset `uri` belongs to, or undefined when it was typed by hand. */
 export const swarmPresetFor = (uri: string): SwarmServerPreset | undefined =>
   SWARM_SERVER_PRESETS.find((preset) => preset.uri === uri);
