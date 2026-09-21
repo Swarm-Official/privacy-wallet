@@ -56,8 +56,12 @@ export const SWARM_SERVER_PRESETS: readonly SwarmServerPreset[] = [
     note: "The project's hosted indexer. It is not running yet.",
   },
   {
+    // 9067 is the light-wallet gRPC port in network/swarm-testnet/manifest.json,
+    // which is Zaino's conventional one. Not 19767: that belongs to the
+    // retired Privacy Testnet's indexer, and pointing this build at it would
+    // dial a node serving a different genesis.
     label: "My own node",
-    uri: "http://127.0.0.1:19767",
+    uri: "http://127.0.0.1:9067",
     note: "A SwarmTestnet indexer you run on this computer.",
   },
 ];

@@ -9,17 +9,27 @@
 // Usage:
 //   node scripts/check-swarm-sdk-pin.js <path to a checkout of the pinned SDK>
 //   node scripts/check-swarm-sdk-pin.js <path> --require-real-genesis
+//   node scripts/check-swarm-sdk-pin.js <path> --manifest <network manifest>
 //
-// The second form is the release gate. SwarmTestnet's genesis block does not
-// exist yet, so every build until it does carries a placeholder; a release
-// build must refuse that, and this is where it refuses.
+// `--require-real-genesis` is the release gate: a build carrying the SDK's
+// genesis placeholder is refused outright.
+//
+// `--manifest` points at `network/swarm-testnet/manifest.json`, the network's
+// own definition and the authority on what SwarmTestnet is. That file is not
+// in this repository — the pin carries a copy of the fields that matter — so
+// when the real one is reachable it is read and compared, and the copy is
+// checked against it rather than trusted.
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
 const root = path.resolve(__dirname, "..");
-const [sdkPath = path.join(root, "sdk-source"), ...flags] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const flags = argv.filter((argument) => argument.startsWith("--"));
+const positional = argv.filter((argument, index) => !argument.startsWith("--") && !argv[index - 1]?.startsWith("--manifest"));
+const [sdkPath = path.join(root, "sdk-source")] = positional;
 const requireRealGenesis = flags.includes("--require-real-genesis");
+const manifestPath = argv[argv.indexOf("--manifest") + 1];
 
 const pin = JSON.parse(fs.readFileSync(path.join(root, "sdk/swarm-sdk-pin.json"), "utf8"));
 const fail = (message) => {
@@ -27,6 +37,51 @@ const fail = (message) => {
 };
 
 if (!/^[0-9a-f]{40}$/.test(pin.commit)) fail("The SDK pin does not name an exact revision.");
+
+// 0. The network's own definition, when it is reachable. The manifest is the
+//    authority: the pin's copy of it must agree, field for field.
+if (manifestPath) {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const expected = {
+    networkName: manifest.identity?.network_name,
+    lightWalletChainLabel: manifest.identity?.light_wallet_chain_label,
+    genesisHash: manifest.genesis?.hash,
+    genesisBlockSha256: manifest.genesis?.block_sha256,
+    lightWalletGrpcPort: manifest.ports?.lightwallet_grpc,
+    generatorCommit: manifest.genesis?.generator?.commit,
+    reproductions: manifest.genesis?.generator?.reproductions,
+  };
+  for (const [field, value] of Object.entries(expected)) {
+    if (value === undefined) fail(`The network manifest does not state ${field}.`);
+    if (pin.manifest?.[field] !== value) {
+      fail(`The pin says ${field}=${JSON.stringify(pin.manifest?.[field])}, the manifest says ${JSON.stringify(value)}.`);
+    }
+  }
+  if (pin.genesis !== expected.genesisHash) fail("The pinned genesis is not the manifest's genesis.");
+  if (pin.chainName !== expected.lightWalletChainLabel) fail("The pinned chain label is not the manifest's.");
+
+  // A genesis block stamped in the future cannot be built on: the chain
+  // produces no block 1 until that time arrives, and a wallet pinned to it
+  // would sit on an empty chain with nothing wrong that it could report. The
+  // first generated genesis had this fault, which cost a rebuild; it is
+  // cheaper to refuse the pin than to find out from a silent wallet.
+  const genesisTime = manifest.genesis?.time_unix;
+  if (typeof genesisTime !== "number") fail("The network manifest does not state genesis.time_unix.");
+  const now = Math.floor(Date.now() / 1000);
+  if (genesisTime > now) {
+    fail(
+      `The manifest's genesis is stamped ${manifest.genesis.time_utc ?? genesisTime}, which is ` +
+        `${Math.round((genesisTime - now) / 3600)} hour(s) in the future. The chain cannot produce ` +
+        `block 1 until then, so there is nothing for a wallet to sync.`,
+    );
+  }
+  console.log(
+    `Network manifest checked: ${expected.networkName} at ${expected.genesisHash}, ` +
+      `stamped ${manifest.genesis.time_utc ?? genesisTime}.`,
+  );
+} else if (pin.manifest?.genesisHash !== pin.genesis || pin.manifest?.lightWalletChainLabel !== pin.chainName) {
+  fail("The pin's copy of the network manifest disagrees with the pin itself.");
+}
 
 // 1. The manifest names that revision, for every crate it takes from the SDK.
 const manifest = fs.readFileSync(path.join(root, "native/Cargo.toml"), "utf8");

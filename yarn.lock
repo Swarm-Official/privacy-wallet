@@ -1617,6 +1617,21 @@
   resolved "https://registry.yarnpkg.com/@eslint/js/-/js-8.57.1.tgz#de633db3ec2ef6a3c89e2f19038063e8a122e2c2"
   integrity sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==
 
+"@fontsource/jetbrains-mono@5.2.5":
+  version "5.2.5"
+  resolved "https://registry.yarnpkg.com/@fontsource/jetbrains-mono/-/jetbrains-mono-5.2.5.tgz#c3e9931ae7ebd70b25b6aaf98caf5c2720aaffb3"
+  integrity sha512-TPZ9b/uq38RMdrlZZkl0RwN8Ju9JxuqMETrw76pUQFbGtE1QbwQaNsLlnUrACNNBNbd0NZRXiJJSkC8ajPgbew==
+
+"@fontsource/manrope@5.2.5":
+  version "5.2.5"
+  resolved "https://registry.yarnpkg.com/@fontsource/manrope/-/manrope-5.2.5.tgz#a2e98f1d879dc71f452b8641167932e1df7f6070"
+  integrity sha512-4mYUAhsuF8KoXseG8T9woWUc/foznUVluFtE6fCKAqe76WM3kmDNedaINWjzWB73+wly0duFvVpDBma3NXXT0g==
+
+"@fontsource/sora@5.2.5":
+  version "5.2.5"
+  resolved "https://registry.yarnpkg.com/@fontsource/sora/-/sora-5.2.5.tgz#9de5281ef46894860a602cafe066c399576a5f24"
+  integrity sha512-tYBw4RHgNEhwOrsqSVlFKt4hdpf9/2taC+ygQJzw6wyPvQnnqJgYz+rGwuTOi3Wuv1qgoyyRpHkcKO7O8nSrEw==
+
 "@fortawesome/fontawesome-common-types@7.2.0":
   version "7.2.0"
   resolved "https://registry.yarnpkg.com/@fortawesome/fontawesome-common-types/-/fontawesome-common-types-7.2.0.tgz#ae54831ab5974bc1a64e8b07410f2da2b4abf87f"

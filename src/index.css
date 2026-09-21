@@ -4,6 +4,29 @@
  */
 @import "~typeface-roboto/index.css";
 
+/*
+ * The three faces the style guide sets, bundled with the application.
+ *
+ * Nothing here reaches the network: @fontsource ships the .woff2 files inside
+ * the package, webpack inlines them into the build, and the packaged wallet
+ * serves them from its own asar. A wallet that fetched a font would tell a
+ * font host when it was opened, which is not a thing this application does.
+ *
+ * Only the weights the design uses, and only the latin subset — Sora 400/500/
+ * 600/700 for display, Manrope 400/500/600 for reading, JetBrains Mono 400/500
+ * for numbers, hashes and addresses. Each package carries the SIL Open Font
+ * License its family is published under.
+ */
+@import "~@fontsource/sora/latin-400.css";
+@import "~@fontsource/sora/latin-500.css";
+@import "~@fontsource/sora/latin-600.css";
+@import "~@fontsource/sora/latin-700.css";
+@import "~@fontsource/manrope/latin-400.css";
+@import "~@fontsource/manrope/latin-500.css";
+@import "~@fontsource/manrope/latin-600.css";
+@import "~@fontsource/jetbrains-mono/latin-400.css";
+@import "~@fontsource/jetbrains-mono/latin-500.css";
+
 html {
   overflow: hidden;
 }

@@ -1,11 +1,24 @@
 {
   "repository": "https://github.com/brs-holding/privacy-zingolib",
   "branch": "swarm-testnet-wallet",
-  "commit": "508136111b879fa5917ef25ae94784504eef3256",
+  "commit": "d81ef1a845916e06130c7da80be742a0ec2fedce",
   "chainName": "swarm-testnet",
-  "genesis": "535741524d544553544e455447454e45534953504c414345484f4c4445522121",
-  "genesisIsPlaceholder": true,
-  "status": "Development build. SwarmTestnet's genesis block does not exist yet, so the pinned SDK carries SWARM_TESTNET_GENESIS_PLACEHOLDER. This is not a release.",
+  "genesis": "06b0b56c0dcf8695df0192439b73038006c48e3b1a7b907ecee69ef412d440fc",
+  "genesisIsPlaceholder": false,
+  "manifest": {
+    "source": "network/swarm-testnet/manifest.json in the project repository",
+    "schema": "swarm-network-manifest/1",
+    "networkName": "SwarmTestnet",
+    "lightWalletChainLabel": "swarm-testnet",
+    "genesisHash": "06b0b56c0dcf8695df0192439b73038006c48e3b1a7b907ecee69ef412d440fc",
+    "genesisBlockSha256": "3fc61d109ef28df31cc44c9325b9f288bfcafcb89c7fd74cf508bb503b2a0e82",
+    "lightWalletGrpcPort": 9067,
+    "generatorCommit": "a5d1be055cf87fe59ef88c34591054d9dac080be",
+    "generatorRun": "https://github.com/brs-holding/privacy-zebra/actions/runs/35620844481",
+    "reproductions": 4,
+    "note": "Copied from the manifest so the build can check itself against it. The manifest is not in this repository; scripts/check-swarm-sdk-pin.js --manifest <path> re-reads the authoritative file when it is available."
+  },
+  "status": "SUPERSEDED, DO NOT BUILD. This genesis is stamped 2026-09-22T00:00:00Z, in the future, so the chain cannot produce block 1 until then and a wallet pinned to it would sync nothing. The network's genesis is being regenerated with a past timestamp; re-pin from the new manifest before dispatching a build. scripts/check-swarm-sdk-pin.js --manifest refuses this pin on exactly that ground.",
   "verified": [
     "6 focused SDK tests (zingolib, Rust 1.96.0)",
     "1 focused CLI test (clearnet-test-mode)"

@@ -96,7 +96,7 @@ const SeedUfvkModalContent: React.FC<SeedUfvkModalContentProps> = ({ seedStr, uf
               ...dataBoxStyle,
               textAlign: "center",
               wordBreak: "break-word",
-              fontFamily: "monospace, Roboto",
+              fontFamily: "var(--font-mono)",
               fontWeight: "bolder",
             }}
           >
@@ -137,7 +137,7 @@ const SeedUfvkModalContent: React.FC<SeedUfvkModalContentProps> = ({ seedStr, uf
               cursor: "pointer",
               textAlign: "center",
               wordBreak: "break-word",
-              fontFamily: "monospace, Roboto",
+              fontFamily: "var(--font-mono)",
               fontWeight: "bolder",
             }}
             onClick={() => copyUfvk(ufvkStr)}
@@ -171,7 +171,7 @@ const SeedUfvkModalContent: React.FC<SeedUfvkModalContentProps> = ({ seedStr, uf
           minWidth: 120,
           cursor: "pointer",
           textAlign: "center",
-          fontFamily: "monospace, Roboto",
+          fontFamily: "var(--font-mono)",
           fontWeight: "bolder",
         }}
         onClick={() => copyBirthday(birthdayStr)}

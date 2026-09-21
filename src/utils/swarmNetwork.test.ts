@@ -32,7 +32,7 @@ describe("the servers offered for this chain", () => {
   it("offers the project server first and a local node second", () => {
     expect(SWARM_SERVER_PRESETS.map((preset) => preset.uri)).toEqual([
       "https://lwd.swarm.green:443",
-      "http://127.0.0.1:19767",
+      "http://127.0.0.1:9067",
     ]);
     expect(SWARM_DEFAULT_SERVER).toBe(SWARM_SERVER_PRESETS[0].uri);
   });

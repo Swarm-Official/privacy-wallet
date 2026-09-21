@@ -19,7 +19,7 @@ Two presets, plus a free-text field:
 | Preset | Endpoint | State |
 | --- | --- | --- |
 | SWARM public server (default) | `https://lwd.swarm.green:443` | not deployed yet |
-| My own node | `http://127.0.0.1:19767` | a SwarmTestnet indexer running on this computer |
+| My own node | `http://127.0.0.1:9067` | a SwarmTestnet indexer running on this computer |
 
 The default does not answer yet, so creating a wallet asks the chosen server whether it is there first and says what is wrong in words rather than failing at the transport.
 
@@ -59,9 +59,10 @@ Two rules from the guide are load-bearing rather than decorative:
 
 Motion is decoration and a `prefers-reduced-motion` preference switches all of it off.
 
+**Fonts are bundled, never fetched.** Sora, Manrope and JetBrains Mono come from the pinned `@fontsource/*` packages and are imported in `src/index.css` — only the weights the design uses (Sora 400/500/600/700, Manrope 400/500/600, JetBrains Mono 400/500) and only the latin subset. Webpack emits the `.woff2` files into the build and the packaged wallet serves them from its own asar; the built stylesheet contains no remote font URL. A wallet that fetched a font would tell a font host when it was opened, which is not something this application does. Each package ships the SIL Open Font License its family is published under.
+
 Not yet done, and deliberately not faked:
 
-- **Fonts.** Sora, Manrope and JetBrains Mono are named first in `--font-display`, `--font-text` and `--font-mono` and are never fetched from the network. The files are not in the repository yet; see `src/assets/fonts/README.md`. Until they are, the fallbacks render and the type *roles* still hold.
 - **A COINBASE state pill.** Nothing in this wallet reports whether an output is a maturing coinbase, so there is no pill for it.
 - **Hiding balances.** `maskAmount` implements the guide's masking (`⬢⬢⬢⬢.⬢⬢ SWM`) and is tested, but no control switches it on yet.
 
