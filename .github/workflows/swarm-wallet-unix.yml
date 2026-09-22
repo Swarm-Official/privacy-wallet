@@ -38,11 +38,11 @@ jobs:
             # 22.04 rather than latest: the glibc a binary is built against is
             # the oldest it will run on, so building on the older image is what
             # lets the AppImage work on both 22.04 and 24.04.
-            electron_flags: "--linux AppImage deb --x64"
+            electron_flags: "--linux --x64"
           - platform: mac-arm64
             runner: macos-14
             arch: arm64
-            electron_flags: "--mac dmg zip --arm64"
+            electron_flags: "--mac --arm64"
           # Cross-compiled on an arm64 host. The macos-13 Intel pool stopped
           # picking up jobs — a mac-x64 job sat queued on it for over two hours
           # — so the Intel build is produced here instead, with every target
@@ -50,7 +50,7 @@ jobs:
           - platform: mac-x64
             runner: macos-14
             arch: x64
-            electron_flags: "--mac dmg zip --x64"
+            electron_flags: "--mac --x64"
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     steps:
@@ -133,6 +133,8 @@ jobs:
         run: node scripts/check-swarm-bundle-strings.js --renderer build/static/js
       - name: Package the unsigned test wallet
         run: yarn electron-builder ${{ matrix.electron_flags }} --config configs/swarm-testnet-builder.cjs --publish never
+      - name: Check every declared package target was produced
+        run: node scripts/check-swarm-dist-targets.js ${{ matrix.platform == 'linux' && 'linux' || 'mac' }}
       - name: Record whether the wallet server was reachable from this runner
         run: node scripts/swarm-reachability.js
       - name: Check the packaged application shows no upstream naming

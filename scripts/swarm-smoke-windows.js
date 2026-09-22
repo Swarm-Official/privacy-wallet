@@ -57,8 +57,30 @@ const findUnder = (root, predicate) => {
   return null;
 };
 
+// Which stage the script is in. A smoke run has five of them and they fail in
+// very different ways — a landing screen that is wrong is a defect in the
+// application, a missing installer is a packaging mistake — so the failure
+// names the stage rather than leaving the next reader to infer it from the job
+// log.
+let stage = "starting";
+const at = (next) => {
+  stage = next;
+  console.log(`\n== ${next} ==`);
+};
+
 const fail = (why, extra) => {
-  console.error(`\n${why}`);
+  // Top level, beside the per-run subdirectories: the first thing somebody
+  // opening the diagnostics artifact should see is which stage stopped it.
+  try {
+    fs.mkdirSync(diagnostics, { recursive: true });
+    fs.writeFileSync(
+      path.join(diagnostics, "failure.txt"),
+      `stage: ${stage}\n\n${why}\n${extra ? `\n${extra}\n` : ""}`,
+    );
+  } catch (error) {
+    console.error(`could not write failure.txt: ${error.message}`);
+  }
+  console.error(`\n[${stage}] ${why}`);
   if (extra) console.error(extra);
   process.exit(1);
 };
@@ -78,6 +100,7 @@ const fail = (why, extra) => {
  * what made the Linux and macOS runs time out having never spoken to the app.
  */
 const startAndFindUserData = async (exe, label) => {
+  at(`${label} smoke`);
   const port = devtoolsPort++;
   console.log(`\n${label}: starting ${exe}`);
   const child = spawn(exe, [`--remote-debugging-port=${port}`], { env, stdio: ["ignore", "pipe", "pipe"] });
@@ -144,14 +167,17 @@ const startAndFindUserData = async (exe, label) => {
 };
 (async () => {
   // 1. The portable build, exactly as somebody unzipping would run it.
+  at("locating the portable build");
   const portable = path.join(dist, "win-unpacked", EXECUTABLE);
   if (!fs.existsSync(portable)) fail(`no portable build at ${portable}`);
   const fromZip = await startAndFindUserData(portable, "portable");
 
   // 2. The installer, silently.
+  at("locating the one-click installer");
   const setup = findUnder(dist, (full) => full.endsWith("-setup.exe"));
   if (!setup) fail("no one-click installer in dist");
   console.log(`\ninstaller: running ${path.basename(setup)} /S`);
+  at("installer /S");
   const install = spawnSync(setup, ["/S"], { env, stdio: "inherit", timeout: 300_000 });
   if (install.status !== 0) fail(`the installer exited with ${install.status}`);
 
@@ -166,6 +192,7 @@ const startAndFindUserData = async (exe, label) => {
   // 3. The installed build, and the comparison this whole script exists for.
   const fromInstaller = await startAndFindUserData(installed, "installed");
 
+  at("userData comparison");
   if (!fromZip.userData || !fromInstaller.userData) {
     fail(
       "could not find startup.log under the throwaway profile for one of the builds, so the two " +
@@ -184,6 +211,7 @@ const startAndFindUserData = async (exe, label) => {
 
   // 4. Uninstall, silently, and check it took the program away and left the
   //    wallet alone.
+  at("uninstall /S");
   const uninstaller = findUnder(path.dirname(installed), (full) =>
     /^Uninstall .*\.exe$/i.test(path.basename(full)),
   );

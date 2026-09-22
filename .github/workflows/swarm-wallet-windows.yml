@@ -130,8 +130,15 @@ jobs:
             sdk-integration.json
             compile-source-commit.txt
           retention-days: 7
+      # No target list here on purpose. The config declares ["zip", "nsis"];
+      # naming targets again on the command line overrides it, and this line
+      # said only `zip`, so the one-click installer was never built and the
+      # smoke test that installs it could not have passed on any run. The
+      # config is now the only place targets are decided.
       - name: Package the unsigned test wallet
-        run: yarn electron-builder --win zip --x64 --config configs/swarm-testnet-builder.cjs --publish never
+        run: yarn electron-builder --win --x64 --config configs/swarm-testnet-builder.cjs --publish never
+      - name: Check every declared package target was produced
+        run: node scripts/check-swarm-dist-targets.js win
       - name: Record whether the wallet server was reachable from this runner
         run: node scripts/swarm-reachability.js
       - name: Check the packaged application shows no upstream naming

@@ -275,7 +275,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
         // by 30-day uptime, which is not speed: a reliable server answering in
         // ten seconds sits at the top of that list and made the wallet crawl.
         const candidates: ServerClass[] = keep(live).slice(0, RACE_CANDIDATES);
-        const quickest: ServerClass | null = await this.stepped("selecting fastest server", () =>
+        const quickest: ServerClass | null = await this.stepped("connecting to the server", () =>
           selectFastestServer(candidates),
         );
         uri = quickest ? quickest.uri : candidates[0].uri;
@@ -288,7 +288,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
         const servers: ServerClass[] = keep(
           serverUrisList().filter((s: ServerClass) => s.chain_name === chain_name && !s.obsolete),
         );
-        const fastest: ServerClass | null = await this.stepped("selecting fastest server", () =>
+        const fastest: ServerClass | null = await this.stepped("connecting to the server", () =>
           selectFastestServer(servers),
         );
         uri = fastest ? fastest.uri : defaultServerForChain(chain_name) || uri;
