@@ -164,7 +164,7 @@ jobs:
         shell: pwsh
         run: |
           git rev-parse HEAD | Set-Content dist/source-commit.txt
-          Get-FileHash dist/*.zip -Algorithm SHA256 | Format-List | Out-File dist/SHA256SUMS.txt
+          Get-FileHash dist/*.zip, dist/*.exe -Algorithm SHA256 | Format-List | Out-File dist/SHA256SUMS.txt
           Copy-Item native/Cargo.lock dist/Cargo.lock
           Copy-Item sdk-integration.json dist/sdk-integration.json
       - uses: actions/upload-artifact@v4
@@ -172,6 +172,7 @@ jobs:
           name: swarm-wallet-windows-x64-unsigned-testnet
           path: |
             dist/*.zip
+            dist/*.exe
             dist/SHA256SUMS.txt
             dist/source-commit.txt
             dist/Cargo.lock
