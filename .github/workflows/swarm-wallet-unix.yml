@@ -43,8 +43,12 @@ jobs:
             runner: macos-14
             arch: arm64
             electron_flags: "--mac dmg zip --arm64"
+          # Cross-compiled on an arm64 host. The macos-13 Intel pool stopped
+          # picking up jobs — a mac-x64 job sat queued on it for over two hours
+          # — so the Intel build is produced here instead, with every target
+          # named explicitly and the result verified by check-swarm-macho-arch.
           - platform: mac-x64
-            runner: macos-13
+            runner: macos-14
             arch: x64
             electron_flags: "--mac dmg zip --x64"
     runs-on: ${{ matrix.runner }}
@@ -76,6 +80,14 @@ jobs:
           rustup toolchain install 1.96.0 --profile minimal
           rustup default 1.96.0
           npm install --global yarn@1.22.22
+      # mac-x64 is built on an arm64 host, so the Intel standard library is not
+      # the host's and has to be asked for. Both cargo invocations below name
+      # --target x86_64-apple-darwin already; without this they fail outright
+      # rather than quietly producing an arm64 binary, but there is no reason
+      # to spend an hour of compilation finding that out.
+      - name: Add the Intel Rust target for the cross-build
+        if: matrix.platform == 'mac-x64'
+        run: rustup target add x86_64-apple-darwin
       - name: Install protoc (Linux)
         if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
@@ -125,6 +137,12 @@ jobs:
         run: node scripts/swarm-reachability.js
       - name: Check the packaged application shows no upstream naming
         run: node scripts/check-swarm-bundle-strings.js --asar dist --renderer build/static/js
+      # The cross-build's own check. A single host-architecture binary inside
+      # the bundle produces a package that installs, launches, and dies when it
+      # loads that file — and nobody here has an Intel Mac to find that out on.
+      - name: Check every binary is built for this platform's architecture
+        if: startsWith(matrix.platform, 'mac')
+        run: node scripts/check-swarm-macho-arch.js ${{ matrix.platform }}
       # A package nobody has started is a guess. These do not go past the
       # unlock screen and create no wallet; they answer one question only —
       # does the thing we are about to publish run at all on this platform.
@@ -133,9 +151,23 @@ jobs:
         run: |
           sudo apt-get install -y xvfb libfuse2
           node scripts/swarm-smoke.js linux
+      # An x64 application on an arm64 host needs Rosetta, which is not listed
+      # in the macos-14 arm64 image's installed software. This asks for it
+      # rather than assuming either way: idempotent where it is already there,
+      # and where it cannot be had the smoke test is skipped *loudly* below
+      # instead of quietly passing.
+      - name: Enable Rosetta so the cross-built Intel app can be started
+        id: rosetta
+        if: matrix.platform == 'mac-x64'
+        continue-on-error: true
+        run: softwareupdate --install-rosetta --agree-to-license
       - name: Smoke-test the packaged application
-        if: startsWith(matrix.platform, 'mac')
+        if: startsWith(matrix.platform, 'mac') && (matrix.platform != 'mac-x64' || steps.rosetta.outcome == 'success')
         run: node scripts/swarm-smoke.js mac
+      - name: Say plainly that the Intel application was never started
+        if: matrix.platform == 'mac-x64' && steps.rosetta.outcome != 'success'
+        run: |
+          echo "::warning title=Intel build not smoke-tested::Rosetta 2 could not be installed on this arm64 runner, so the cross-built Intel application was packaged but never started. Its architecture is verified by check-swarm-macho-arch, but no one has watched it run."
       # Whatever the smoke test saw, kept whether it passed or failed: the
       # screen, the renderer console, the profile tree and the process output.
       # A failure should cost one look, not another three-platform cycle.
