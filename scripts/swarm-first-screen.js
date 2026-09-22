@@ -184,38 +184,41 @@ function listTree(root, limit = 400) {
 }
 
 /**
- * Checks the first screen, in two stages, because what "first screen" means
+ * Checks where a profile with no wallet lands, in two stages, because that
  * depends on whether the machine has device authentication.
  *
  * Where it does — a Mac with Touch ID, the owner's PC with Windows Hello — the
- * first screen is the lock screen, and the wallet is behind it. Where it does
- * not, the gate succeeds silently and the wallet's own header is the first
- * thing shown. An earlier version of this asserted the header unconditionally
- * and failed the macOS build for displaying exactly the right screen.
+ * landing screen is the lock screen, and everything else is behind it. Where it
+ * does not, the gate succeeds silently and the app routes on: a throwaway
+ * profile has no wallet, so it belongs on the onboarding welcome, which says
+ * what this is and offers to create or restore one.
  *
- * Stage one applies to both and is where the real regressions would show: the
- * application's own name, never upstream's, and never the W-5 sentence.
+ * Stage one applies to both and is where the branding and W-5 regressions would
+ * show: this application's own name, never upstream's, and never "No server
+ * configured".
  *
- * Stage two — the header naming the configured server — can only be asserted
- * where the gate auto-succeeded. `expectHeader` says which case the caller is
- * in, so a lock screen appearing where the header was expected is a failure
- * rather than something quietly accepted.
+ * Stage two is the routing. Before defect W-6 was fixed, the same profile
+ * landed on the dashboard — six nav items, a row of zeroes, and no way to make
+ * a wallet — so the dashboard appearing here is a failure with a name, not an
+ * unrecognised screen. `deviceAuth` says which case the caller is in, so a lock
+ * screen where onboarding was expected (or the reverse) is reported rather than
+ * quietly accepted.
  *
  * The lock is never passed in CI. There is no device to authenticate with and
  * nothing here should behave as though there were.
  */
-function assertFirstScreen(text, { expectHeader = true } = {}) {
+function assertLandingScreen(text, { deviceAuth = false } = {}) {
   if (/No server configured/i.test(text)) {
     throw new Error(
-      "The first screen says 'No server configured'. A fresh profile is configured with the SWARM " +
+      "The landing screen says 'No server configured'. A fresh profile is configured with the SWARM " +
         "server on first run, so this is the defect W-5 regression.",
     );
   }
   if (/\bZingo\b/i.test(text)) {
-    throw new Error("The first screen names Zingo. This application is SWARM Wallet.");
+    throw new Error("The landing screen names Zingo. This application is SWARM Wallet.");
   }
-  if (!/SWARM Wallet/.test(text)) {
-    throw new Error("The first screen does not name this application.");
+  if (!/\bSWARM\b/.test(text)) {
+    throw new Error("The landing screen does not name this application.");
   }
 
   const locked = /is locked/i.test(text);
@@ -223,9 +226,9 @@ function assertFirstScreen(text, { expectHeader = true } = {}) {
     if (!/v\d+\.\d+\.\d+/.test(text)) {
       throw new Error("The lock screen does not show a version.");
     }
-    if (expectHeader) {
+    if (!deviceAuth) {
       throw new Error(
-        "Expected the wallet's header, but this machine showed the device-authentication lock " +
+        "Expected the onboarding screen, but this machine showed the device-authentication lock " +
           "screen. On a runner with no device authentication the gate succeeds silently, so a lock " +
           "screen here means that assumption no longer holds.",
       );
@@ -233,10 +236,58 @@ function assertFirstScreen(text, { expectHeader = true } = {}) {
     return { screen: "lock" };
   }
 
-  if (!/lwd\.swarm\.green/.test(text)) {
-    throw new Error("The first screen does not name the server the profile is configured for.");
+  if (deviceAuth) {
+    throw new Error(
+      "Expected the device-authentication lock screen on this machine, but the app went straight " +
+        "past it. The lock must not be bypassable.",
+    );
   }
-  return { screen: "wallet" };
+
+  // Defect W-6: a profile with no wallet used to land here.
+  if (/\bOverview\b/.test(text) && !/Create a new wallet/i.test(text)) {
+    throw new Error(
+      "A profile with no wallet landed on the dashboard, which shows nothing and offers no way to " +
+        "make a wallet. This is defect W-6. The landing screen should be the onboarding welcome.",
+    );
+  }
+
+  if (!/Create a new wallet/i.test(text) || !/I already have a recovery phrase/i.test(text)) {
+    throw new Error(
+      "A profile with no wallet did not land on the onboarding welcome: neither 'Create a new " +
+        "wallet' nor 'I already have a recovery phrase' is offered (defect W-6).",
+    );
+  }
+  if (!/SWARM Testnet/.test(text)) {
+    throw new Error("The onboarding screen does not name the network this build is for.");
+  }
+  return { screen: "onboarding" };
 }
 
-module.exports = { Devtools, waitForFirstScreen, writeDiagnostics, listTree, assertFirstScreen };
+
+/**
+ * The screen once it has stopped changing.
+ *
+ * The first paint is not the landing screen: the app renders, then decides
+ * where a profile with no wallet belongs and navigates there. Capturing at the
+ * first words on the page caught the dashboard mid-flight and reported it as
+ * where a new user lands (defect W-6). This waits for the text to hold still,
+ * so what is asserted is where they actually end up.
+ */
+async function waitForSettledScreen(devtools, settleMs = 10000, quietMs = 1500) {
+  const deadline = Date.now() + settleMs;
+  let last = null;
+  let lastChange = Date.now();
+  for (;;) {
+    const text = await devtools.evaluate("document.body ? document.body.innerText : ''").catch(() => null);
+    if (typeof text === 'string' && text !== last) {
+      last = text;
+      lastChange = Date.now();
+    }
+    if (Date.now() - lastChange >= quietMs || Date.now() > deadline) {
+      return (last ?? "").replace(/\n{2,}/g, "\n").trim();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+}
+
+module.exports = { Devtools, waitForFirstScreen, waitForSettledScreen, writeDiagnostics, listTree, assertLandingScreen };

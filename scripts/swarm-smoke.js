@@ -23,9 +23,10 @@ const os = require("os");
 const path = require("path");
 const {
   waitForFirstScreen,
+  waitForSettledScreen,
   writeDiagnostics,
   listTree,
-  assertFirstScreen,
+  assertLandingScreen,
 } = require("./swarm-first-screen");
 
 const PRODUCT = "SWARM Wallet (Testnet)";
@@ -95,20 +96,10 @@ const stop = () => {
 
 (async () => {
   let devtools = null;
+  let settledForDiagnostics = null;
   try {
     const result = await waitForFirstScreen(DEVTOOLS_PORT, RENDER_TIMEOUT_MS);
     devtools = result.devtools;
-
-    // Where the app actually put its profile — reported, not assumed, because
-    // assuming it is what cost the last three-platform cycle.
-    const userData = await devtools.evaluate("''").catch(() => "");
-    void userData;
-
-    await writeDiagnostics(devtools, diagnostics, {
-      "process-output.log": output.trim() || "(nothing)",
-      "throwaway-home.txt": listTree(home),
-      "screen.txt": result.text || "(empty)",
-    });
 
     if (result.timedOut) {
       throw new Error(
@@ -117,15 +108,33 @@ const stop = () => {
       );
     }
 
-    console.log(`\n--- first screen ---\n${result.text}\n--------------------`);
+    // The landing screen, not the first paint. The app renders, then decides
+    // where a profile with no wallet belongs and navigates there; capturing at
+    // the first words on the page caught the dashboard mid-flight and reported
+    // it as where a new user lands (defect W-6).
+    const settled = await waitForSettledScreen(devtools);
+    settledForDiagnostics = settled;
+    console.log(`\n--- landing screen ---\n${settled}\n----------------------`);
+
+    // Written before the assertion, so the evidence exists whether it passes
+    // or fails — and `screen.txt` holds the landing screen, which is the thing
+    // being judged, rather than the first paint on the way to it.
+    await writeDiagnostics(devtools, diagnostics, {
+      "process-output.log": output.trim() || "(nothing)",
+      "throwaway-home.txt": listTree(home),
+      "screen.txt": settled || "(empty)",
+      "first-paint.txt": result.text || "(empty)",
+    });
+
     // macOS runners have Touch ID, so the wallet correctly stops at the lock
     // screen; Linux has no device authentication, so the gate succeeds and the
-    // header is shown. Both are right, and which one to expect is known here.
-    const seen = assertFirstScreen(result.text, { expectHeader: platform !== "mac" });
+    // profile — which has no wallet — is routed to onboarding. Both are right,
+    // and which one to expect is known here.
+    const seen = assertLandingScreen(settled, { deviceAuth: platform === "mac" });
     console.log(
       seen.screen === "lock"
         ? "\nThe packaged wallet started and stopped at its device-authentication lock screen, named correctly."
-        : "\nThe packaged wallet started and its first screen names the configured server.",
+        : "\nThe packaged wallet started and a profile with no wallet landed on the onboarding welcome.",
     );
     devtools.close();
     stop();
@@ -134,6 +143,7 @@ const stop = () => {
     await writeDiagnostics(devtools, diagnostics, {
       "process-output.log": output.trim() || "(nothing)",
       "throwaway-home.txt": listTree(home),
+      "screen.txt": settledForDiagnostics || "(never settled)",
       "failure.txt": String(error && error.stack ? error.stack : error),
     });
     if (devtools) devtools.close();

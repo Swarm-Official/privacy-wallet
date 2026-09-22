@@ -384,6 +384,12 @@ const AppRoutes: React.FC = () => {
     navigate(routes.DASHBOARD, { replace: true, state: {} });
   }, [navigate]);
 
+  // The first screen of a profile with no wallet. `replace` so Back cannot
+  // land someone on the empty dashboard they were just spared.
+  const navigateToOnboarding = useCallback(() => {
+    navigate(routes.ADDNEWWALLET, { replace: true, state: { mode: "addnew" } });
+  }, [navigate]);
+
   const navigateToLoadingScreen = useCallback(() => {
     navigate(routes.LOADING, { replace: true });
   }, [navigate]);
@@ -868,6 +874,7 @@ const AppRoutes: React.FC = () => {
                         setInfo={setInfo}
                         setReadOnly={setReadOnly}
                         navigateToDashboard={navigateToDashboard}
+                        navigateToOnboarding={navigateToOnboarding}
                         setBirthday={setBirthday}
                         setPools={setPools}
                         setWallets={setWallets}

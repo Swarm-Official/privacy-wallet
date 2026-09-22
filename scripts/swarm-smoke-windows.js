@@ -15,7 +15,7 @@
 // installed on the machine running this and no shortcut appears on anyone's
 // desktop.
 const { spawnSync } = require("child_process");
-const { waitForFirstScreen, writeDiagnostics, listTree, assertFirstScreen } = require("./swarm-first-screen");
+const { waitForFirstScreen, waitForSettledScreen, writeDiagnostics, listTree, assertLandingScreen } = require("./swarm-first-screen");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -100,11 +100,24 @@ const startAndFindUserData = async (exe, label) => {
           `(document.readyState = ${result.readyState ?? "unknown"})`,
       );
     }
-    console.log(`\n--- ${label}: first screen ---\n${result.text}\n------------------------------`);
+    console.log(`\n--- ${label}: first paint ---\n${result.text}\n------------------------------`);
     // A GitHub Windows runner has no Windows Hello enrolled, so the gate
-    // succeeds silently and the header is the first screen. The owner's PC
-    // does have Hello and will correctly show the lock screen instead.
-    assertFirstScreen(result.text, { expectHeader: true });
+    // succeeds silently and the app routes on to where a profile with no wallet
+    // belongs. The owner's PC does have Hello and will correctly stop at the
+    // lock screen instead — which is why `deviceAuth` is false only here.
+    //
+    // The landing screen, not the first paint: the first words on the page
+    // caught the dashboard mid-flight and reported it as where a new user lands
+    // (defect W-6).
+    const settled = await waitForSettledScreen(devtools);
+    console.log(`\n--- ${label}: landing screen ---\n${settled}\n--------------------------------`);
+    // Into this run's own subdirectory: this function runs twice, and the
+    // portable run's evidence must survive the installed one.
+    await writeDiagnostics(devtools, path.join(diagnostics, label), {
+      "screen.txt": settled || "(empty)",
+      "first-paint.txt": result.text || "(empty)",
+    });
+    assertLandingScreen(settled, { deviceAuth: false });
 
     const startupLog = findUnder(sandbox, (full) => path.basename(full) === "startup.log");
     const userData = startupLog ? path.dirname(startupLog) : null;
@@ -117,7 +130,7 @@ const startAndFindUserData = async (exe, label) => {
       /* already gone */
     }
     spawnSync("taskkill", ["/IM", EXECUTABLE, "/F"], { stdio: "ignore" });
-    return { userData, screen: result.text };
+    return { userData, screen: settled };
   } catch (error) {
     await writeDiagnostics(devtools, path.join(diagnostics, label), {
       "process-output.log": output.trim() || "(nothing)",

@@ -33,6 +33,13 @@ const STARTUP_WATCHDOG_MS = 45000;
 
 class LoadingScreenState {
   loadingDone: boolean;
+  /**
+   * Loading finished and there was no wallet to open — a brand-new profile,
+   * or one whose last wallet was just deleted. Sent to the onboarding screen
+   * rather than the dashboard, which without a wallet is a row of zeroes and
+   * no way forward (defect W-6).
+   */
+  noWalletToOpen: boolean;
 
   currentWallet: WalletType | null;
 
@@ -46,6 +53,7 @@ class LoadingScreenState {
 
   constructor() {
     this.loadingDone = false;
+    this.noWalletToOpen = false;
     this.currentWallet = null;
     this.walletExists = false;
     this.step = "starting";
@@ -58,6 +66,8 @@ type LoadingScreenProps = {
   setInfo: (info: InfoClass) => void;
   setReadOnly: (readOnly: boolean) => void;
   navigateToDashboard: () => void;
+  /** Where a profile with no wallet goes: the screen that offers to make one. */
+  navigateToOnboarding: () => void;
   setBirthday: (b: number) => void;
   setPools: (o: boolean, s: boolean, t: boolean) => void;
   setWallets: (ws: WalletType[]) => void;
@@ -748,6 +758,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
     if (currentWallet === null) {
       this.setState({
         loadingDone: true,
+        noWalletToOpen: true,
       });
       return;
     }
@@ -843,7 +854,10 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
 
   componentDidUpdate(_prevProps: LoadingScreenProps, prevState: LoadingScreenState) {
     if (!prevState.loadingDone && this.state.loadingDone) {
-      this.navigationTimer = setTimeout(() => this.props.navigateToDashboard(), 10);
+      // Where there is nothing to open, the dashboard has nothing to show and
+      // offers no way to make one. Onboarding does both.
+      const goTo = this.state.noWalletToOpen ? this.props.navigateToOnboarding : this.props.navigateToDashboard;
+      this.navigationTimer = setTimeout(() => goTo(), 10);
     }
   }
 
