@@ -7,6 +7,18 @@
  * can be any size without the screens breaking.
  */
 
+/*
+ * The application's own stylesheet does not set this globally, and a row with
+ * `width: 100%` and padding then measures wider than the panel it sits in —
+ * which is how the Settings values ended up cut off at the card's edge.
+ */
+.shell,
+.shell *,
+.shell *::before,
+.shell *::after {
+  box-sizing: border-box;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
