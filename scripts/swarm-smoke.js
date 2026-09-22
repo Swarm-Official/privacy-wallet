@@ -118,8 +118,15 @@ const stop = () => {
     }
 
     console.log(`\n--- first screen ---\n${result.text}\n--------------------`);
-    assertFirstScreen(result.text);
-    console.log("\nThe packaged wallet started and its first screen names the configured server.");
+    // macOS runners have Touch ID, so the wallet correctly stops at the lock
+    // screen; Linux has no device authentication, so the gate succeeds and the
+    // header is shown. Both are right, and which one to expect is known here.
+    const seen = assertFirstScreen(result.text, { expectHeader: platform !== "mac" });
+    console.log(
+      seen.screen === "lock"
+        ? "\nThe packaged wallet started and stopped at its device-authentication lock screen, named correctly."
+        : "\nThe packaged wallet started and its first screen names the configured server.",
+    );
     devtools.close();
     stop();
     process.exit(0);

@@ -101,7 +101,10 @@ const startAndFindUserData = async (exe, label) => {
       );
     }
     console.log(`\n--- ${label}: first screen ---\n${result.text}\n------------------------------`);
-    assertFirstScreen(result.text);
+    // A GitHub Windows runner has no Windows Hello enrolled, so the gate
+    // succeeds silently and the header is the first screen. The owner's PC
+    // does have Hello and will correctly show the lock screen instead.
+    assertFirstScreen(result.text, { expectHeader: true });
 
     const startupLog = findUnder(sandbox, (full) => path.basename(full) === "startup.log");
     const userData = startupLog ? path.dirname(startupLog) : null;

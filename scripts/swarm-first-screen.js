@@ -183,17 +183,60 @@ function listTree(root, limit = 400) {
   return lines.join("\n") || "(empty)";
 }
 
-/** Throws with the screen's own words when it says what W-5 said. */
-function assertFirstScreen(text) {
+/**
+ * Checks the first screen, in two stages, because what "first screen" means
+ * depends on whether the machine has device authentication.
+ *
+ * Where it does — a Mac with Touch ID, the owner's PC with Windows Hello — the
+ * first screen is the lock screen, and the wallet is behind it. Where it does
+ * not, the gate succeeds silently and the wallet's own header is the first
+ * thing shown. An earlier version of this asserted the header unconditionally
+ * and failed the macOS build for displaying exactly the right screen.
+ *
+ * Stage one applies to both and is where the real regressions would show: the
+ * application's own name, never upstream's, and never the W-5 sentence.
+ *
+ * Stage two — the header naming the configured server — can only be asserted
+ * where the gate auto-succeeded. `expectHeader` says which case the caller is
+ * in, so a lock screen appearing where the header was expected is a failure
+ * rather than something quietly accepted.
+ *
+ * The lock is never passed in CI. There is no device to authenticate with and
+ * nothing here should behave as though there were.
+ */
+function assertFirstScreen(text, { expectHeader = true } = {}) {
   if (/No server configured/i.test(text)) {
     throw new Error(
       "The first screen says 'No server configured'. A fresh profile is configured with the SWARM " +
         "server on first run, so this is the defect W-5 regression.",
     );
   }
+  if (/\bZingo\b/i.test(text)) {
+    throw new Error("The first screen names Zingo. This application is SWARM Wallet.");
+  }
+  if (!/SWARM Wallet/.test(text)) {
+    throw new Error("The first screen does not name this application.");
+  }
+
+  const locked = /is locked/i.test(text);
+  if (locked) {
+    if (!/v\d+\.\d+\.\d+/.test(text)) {
+      throw new Error("The lock screen does not show a version.");
+    }
+    if (expectHeader) {
+      throw new Error(
+        "Expected the wallet's header, but this machine showed the device-authentication lock " +
+          "screen. On a runner with no device authentication the gate succeeds silently, so a lock " +
+          "screen here means that assumption no longer holds.",
+      );
+    }
+    return { screen: "lock" };
+  }
+
   if (!/lwd\.swarm\.green/.test(text)) {
     throw new Error("The first screen does not name the server the profile is configured for.");
   }
+  return { screen: "wallet" };
 }
 
 module.exports = { Devtools, waitForFirstScreen, writeDiagnostics, listTree, assertFirstScreen };
