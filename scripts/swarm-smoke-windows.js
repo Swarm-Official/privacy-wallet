@@ -15,7 +15,7 @@
 // installed on the machine running this and no shortcut appears on anyone's
 // desktop.
 const { spawnSync } = require("child_process");
-const { checkFirstScreen } = require("./swarm-first-screen");
+const { waitForFirstScreen, writeDiagnostics, listTree, assertFirstScreen } = require("./swarm-first-screen");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -29,6 +29,7 @@ const TIMEOUT_MS = 120_000;
 let devtoolsPort = 9333;
 
 const dist = path.resolve(__dirname, "../dist");
+const diagnostics = path.join(dist, "smoke-diagnostics");
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-win-smoke-"));
 const appData = path.join(sandbox, "AppData", "Roaming");
 const localAppData = path.join(sandbox, "AppData", "Local");
@@ -67,55 +68,64 @@ const fail = (why, extra) => {
  * user-data directory the application chose — which is the directory its own
  * startup log turned up in.
  */
-const startAndFindUserData = (exe, label) =>
-  new Promise((resolve) => {
-    const expected = path.join(appData, PRODUCT);
-    const startupLog = path.join(expected, "startup.log");
-    fs.rmSync(expected, { recursive: true, force: true });
+/**
+ * Starts `exe`, waits for its first screen over DevTools, and answers with
+ * the user-data directory the application chose.
+ *
+ * The directory is found, not assumed: the app writes startup.log into
+ * `app.getPath('userData')`, so searching the throwaway profile for that file
+ * is what tells us where it went. Computing the path from the product name is
+ * what made the Linux and macOS runs time out having never spoken to the app.
+ */
+const startAndFindUserData = async (exe, label) => {
+  const port = devtoolsPort++;
+  console.log(`\n${label}: starting ${exe}`);
+  const child = spawn(exe, [`--remote-debugging-port=${port}`], { env, stdio: ["ignore", "pipe", "pipe"] });
+  let output = "";
+  child.stdout.on("data", (c) => (output += c));
+  child.stderr.on("data", (c) => (output += c));
 
-    console.log(`\n${label}: starting ${exe}`);
-    const port = devtoolsPort++;
-    const child = spawn(exe, [`--remote-debugging-port=${port}`], { env, stdio: ["ignore", "pipe", "pipe"] });
-    let output = "";
-    child.stdout.on("data", (c) => (output += c));
-    child.stderr.on("data", (c) => (output += c));
-    let exited = null;
-    child.on("exit", (code) => (exited = code));
+  let devtools = null;
+  try {
+    const result = await waitForFirstScreen(port, TIMEOUT_MS);
+    devtools = result.devtools;
+    await writeDiagnostics(devtools, path.join(diagnostics, label), {
+      "process-output.log": output.trim() || "(nothing)",
+      "throwaway-profile.txt": listTree(sandbox),
+      "screen.txt": result.text || "(empty)",
+    });
+    if (result.timedOut) {
+      throw new Error(
+        `the page never finished loading within ${TIMEOUT_MS / 1000}s ` +
+          `(document.readyState = ${result.readyState ?? "unknown"})`,
+      );
+    }
+    console.log(`\n--- ${label}: first screen ---\n${result.text}\n------------------------------`);
+    assertFirstScreen(result.text);
 
-    const started = Date.now();
-    const poll = () => {
-      if (fs.existsSync(startupLog) && fs.readFileSync(startupLog, "utf8").includes(READY)) {
-        const log = fs.readFileSync(startupLog, "utf8").trim();
-        checkFirstScreen(port).then(
-          (screen) => {
-            try {
-              child.kill();
-            } catch {
-              /* already gone */
-            }
-            spawnSync("taskkill", ["/IM", EXECUTABLE, "/F"], { stdio: "ignore" });
-            console.log(`${label}: first screen names the configured server`);
-            console.log(`${label}: userData = ${expected}`);
-            resolve({ userData: expected, log, screen });
-          },
-          (error) => {
-            spawnSync("taskkill", ["/IM", EXECUTABLE, "/F"], { stdio: "ignore" });
-            fail(`${label}: the first screen is wrong — ${error.message}`);
-          },
-        );
-        return;
-      }
-      if (exited !== null && Date.now() - started > 10_000) {
-        fail(`${label}: exited (code ${exited}) before rendering`, output.trim().split("\n").slice(-25).join("\n"));
-      }
-      if (Date.now() - started > TIMEOUT_MS) {
-        fail(`${label}: did not render within ${TIMEOUT_MS / 1000}s`, output.trim().split("\n").slice(-25).join("\n"));
-      }
-      setTimeout(poll, 500);
-    };
-    poll();
-  });
+    const startupLog = findUnder(sandbox, (full) => path.basename(full) === "startup.log");
+    const userData = startupLog ? path.dirname(startupLog) : null;
+    console.log(`${label}: userData = ${userData ?? "(no startup.log found under the throwaway profile)"}`);
 
+    devtools.close();
+    try {
+      child.kill();
+    } catch {
+      /* already gone */
+    }
+    spawnSync("taskkill", ["/IM", EXECUTABLE, "/F"], { stdio: "ignore" });
+    return { userData, screen: result.text };
+  } catch (error) {
+    await writeDiagnostics(devtools, path.join(diagnostics, label), {
+      "process-output.log": output.trim() || "(nothing)",
+      "throwaway-profile.txt": listTree(sandbox),
+      "failure.txt": String(error && error.stack ? error.stack : error),
+    });
+    if (devtools) devtools.close();
+    spawnSync("taskkill", ["/IM", EXECUTABLE, "/F"], { stdio: "ignore" });
+    fail(`${label}: ${error.message}`, output.trim().split("\n").slice(-25).join("\n"));
+  }
+};
 (async () => {
   // 1. The portable build, exactly as somebody unzipping would run it.
   const portable = path.join(dist, "win-unpacked", EXECUTABLE);
@@ -140,6 +150,13 @@ const startAndFindUserData = (exe, label) =>
   // 3. The installed build, and the comparison this whole script exists for.
   const fromInstaller = await startAndFindUserData(installed, "installed");
 
+  if (!fromZip.userData || !fromInstaller.userData) {
+    fail(
+      "could not find startup.log under the throwaway profile for one of the builds, so the two " +
+        "could not be compared:\n" +
+        `  portable  ${fromZip.userData ?? "(not found)"}\n  installed ${fromInstaller.userData ?? "(not found)"}`,
+    );
+  }
   if (fromZip.userData !== fromInstaller.userData) {
     fail(
       "the portable build and the installed build look for a wallet in different places:\n" +

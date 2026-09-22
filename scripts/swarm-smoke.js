@@ -1,42 +1,46 @@
-// Starts the packaged wallet once, on the machine that built it, and asks one
-// question: does it actually run here?
+// Starts the packaged wallet once, on the machine that built it, with a
+// throwaway profile and no arguments a user would not have — and reads what it
+// puts on screen.
 //
-// A build that packages cleanly can still be dead on arrival — a native module
-// for the wrong architecture, a missing system library, an Electron sandbox
-// that the runner's kernel refuses. None of that shows up in a green
-// packaging step, and on Linux and macOS nobody on this project has a machine
-// to try it on. The runner does.
+// A build that packages cleanly can still be dead on arrival: a native module
+// for the wrong architecture, a missing system library, a renderer that throws
+// on a profile with nothing in it. None of that shows in a green packaging
+// step, and nobody on this project has a Linux box or a Mac to try it on. The
+// runner does.
 //
-// What it waits for is not "the process is still alive" — a hung window is
-// still alive. The packaged app writes a startup log into its own user-data
-// directory, and `did-finish-load` in that log means the native module
-// loaded, the renderer was served and the first screen rendered. That screen
-// is the unlock screen, which is exactly as far as anything here should go:
-// no wallet is created, no key material exists, and HOME is a throwaway
-// directory that is discarded with the runner.
+// Readiness comes from DevTools, not from the app's own log file. An earlier
+// version waited for a line in startup.log at a path computed from the product
+// name; on Linux and macOS that file never appeared there, so the check timed
+// out after ninety seconds having never spoken to the app, while DevTools sat
+// listening the whole time. Where the profile actually landed is now something
+// this reports rather than assumes.
+//
+// It goes exactly as far as the unlock screen: no wallet is created, no key
+// material exists, and HOME is a directory thrown away with the runner.
 const { spawnSync, spawn } = require("child_process");
-const { checkFirstScreen } = require("./swarm-first-screen");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const {
+  waitForFirstScreen,
+  writeDiagnostics,
+  listTree,
+  assertFirstScreen,
+} = require("./swarm-first-screen");
 
 const PRODUCT = "SWARM Wallet (Testnet)";
 const EXECUTABLE = "SWARM Wallet Testnet";
-const READY = "did-finish-load";
-// A port nothing else on a runner uses, for reading the rendered screen.
 const DEVTOOLS_PORT = 9333;
-const TIMEOUT_MS = 90_000;
-const POLL_MS = 500;
+const RENDER_TIMEOUT_MS = 120_000;
 
 const platform = process.argv[2];
-if (!["linux", "mac"].includes(platform)) {
-  throw new Error("usage: swarm-smoke.js <linux|mac>");
-}
+if (!["linux", "mac"].includes(platform)) throw new Error("usage: swarm-smoke.js <linux|mac>");
 
 const dist = path.resolve(__dirname, "../dist");
+const diagnostics = path.join(dist, "smoke-diagnostics");
 
-/** The first path under `dist` matching `predicate`, breadth-first. */
 const findUnder = (root, predicate) => {
+  if (!fs.existsSync(root)) return null;
   const queue = [root];
   while (queue.length > 0) {
     const dir = queue.shift();
@@ -49,92 +53,87 @@ const findUnder = (root, predicate) => {
   return null;
 };
 
-// A throwaway HOME, so the launch cannot touch anything the runner already has
-// and the whole profile disappears with the directory.
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-smoke-"));
-const userData =
-  platform === "linux"
-    ? path.join(home, ".config", PRODUCT)
-    : path.join(home, "Library", "Application Support", PRODUCT);
-const startupLog = path.join(userData, "startup.log");
 
 let command;
-let args = [];
+let args = [`--remote-debugging-port=${DEVTOOLS_PORT}`];
 if (platform === "linux") {
   const appImage = findUnder(dist, (full) => full.endsWith(".AppImage"));
   if (!appImage) throw new Error("no AppImage in dist");
   fs.chmodSync(appImage, 0o755);
   console.log(`Starting ${path.basename(appImage)} under Xvfb.`);
   // --no-sandbox: the runner's kernel restricts unprivileged user namespaces
-  // and an AppImage cannot install the SUID helper or the AppArmor profile
-  // that the .deb does. This is a property of running an AppImage on a
-  // locked-down host, not of this build, and it is what the README tells a
-  // user on 24.04 to do.
+  // and an AppImage cannot install the SUID helper or the AppArmor profile the
+  // .deb does. A property of running an AppImage on a locked-down host, not of
+  // this build, and what the README tells a user on 24.04 to do.
+  args = ["-a", appImage, "--no-sandbox", ...args];
   command = "xvfb-run";
-  args = ["-a", appImage, "--no-sandbox", `--remote-debugging-port=${DEVTOOLS_PORT}`];
 } else {
   const app = findUnder(dist, (full, entry) => entry.isDirectory() && full.endsWith(".app"));
   if (!app) throw new Error("no .app in dist");
-  const binary = path.join(app, "Contents", "MacOS", EXECUTABLE);
-  if (!fs.existsSync(binary)) throw new Error(`no executable at ${binary}`);
+  command = path.join(app, "Contents", "MacOS", EXECUTABLE);
+  if (!fs.existsSync(command)) throw new Error(`no executable at ${command}`);
   console.log(`Starting ${path.basename(app)}.`);
-  command = binary;
-  args = [`--remote-debugging-port=${DEVTOOLS_PORT}`];
 }
 
 const child = spawn(command, args, {
   env: { ...process.env, HOME: home, ELECTRON_ENABLE_LOGGING: "1" },
   stdio: ["ignore", "pipe", "pipe"],
 });
-
 let output = "";
 child.stdout.on("data", (chunk) => (output += chunk));
 child.stderr.on("data", (chunk) => (output += chunk));
 
-let exited = null;
-child.on("exit", (code, signal) => (exited = { code, signal }));
-
-const started = Date.now();
-const finish = (ok, why) => {
+const stop = () => {
   try {
     child.kill("SIGTERM");
   } catch {
     /* already gone */
   }
-  // macOS keeps the app alive under its own launch services in some setups.
   if (platform === "mac") spawnSync("pkill", ["-f", EXECUTABLE]);
-  const tail = output.trim().split("\n").slice(-25).join("\n");
-  if (ok) {
-    console.log(`\n${why}`);
-    process.exit(0);
-  }
-  console.error(`\n${why}`);
-  if (tail) console.error(`\nLast output:\n${tail}`);
-  if (fs.existsSync(startupLog)) console.error(`\nStartup log:\n${fs.readFileSync(startupLog, "utf8")}`);
-  process.exit(1);
 };
 
-const poll = () => {
-  if (fs.existsSync(startupLog)) {
-    const log = fs.readFileSync(startupLog, "utf8");
-    if (log.includes(READY)) {
-      // Rendered — now read what it rendered.
-      checkFirstScreen(DEVTOOLS_PORT).then(
-        () => finish(true, `The packaged wallet started and its first screen names the configured server.\n${log.trim()}`),
-        (error) => finish(false, `The first screen is wrong: ${error.message}`),
+(async () => {
+  let devtools = null;
+  try {
+    const result = await waitForFirstScreen(DEVTOOLS_PORT, RENDER_TIMEOUT_MS);
+    devtools = result.devtools;
+
+    // Where the app actually put its profile — reported, not assumed, because
+    // assuming it is what cost the last three-platform cycle.
+    const userData = await devtools.evaluate("''").catch(() => "");
+    void userData;
+
+    await writeDiagnostics(devtools, diagnostics, {
+      "process-output.log": output.trim() || "(nothing)",
+      "throwaway-home.txt": listTree(home),
+      "screen.txt": result.text || "(empty)",
+    });
+
+    if (result.timedOut) {
+      throw new Error(
+        `the page never finished loading within ${RENDER_TIMEOUT_MS / 1000}s ` +
+          `(document.readyState = ${result.readyState ?? "unknown"}, body text ${result.text.length} chars)`,
       );
-      return;
     }
-  }
-  if (exited) {
-    finish(false, `The packaged wallet exited before rendering (code ${exited.code}, signal ${exited.signal}).`);
-    return;
-  }
-  if (Date.now() - started > TIMEOUT_MS) {
-    finish(false, `The packaged wallet did not render within ${TIMEOUT_MS / 1000}s.`);
-    return;
-  }
-  setTimeout(poll, POLL_MS);
-};
 
-poll();
+    console.log(`\n--- first screen ---\n${result.text}\n--------------------`);
+    assertFirstScreen(result.text);
+    console.log("\nThe packaged wallet started and its first screen names the configured server.");
+    devtools.close();
+    stop();
+    process.exit(0);
+  } catch (error) {
+    await writeDiagnostics(devtools, diagnostics, {
+      "process-output.log": output.trim() || "(nothing)",
+      "throwaway-home.txt": listTree(home),
+      "failure.txt": String(error && error.stack ? error.stack : error),
+    });
+    if (devtools) devtools.close();
+    stop();
+    console.error(`\n${error.message}`);
+    console.error(`\nDiagnostics written to ${diagnostics} and uploaded with the build artifacts.`);
+    console.error(`\nLast output:\n${output.trim().split("\n").slice(-30).join("\n")}`);
+    process.exit(1);
+  }
+})();

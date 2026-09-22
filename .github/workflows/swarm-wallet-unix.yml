@@ -136,6 +136,17 @@ jobs:
       - name: Smoke-test the packaged application
         if: startsWith(matrix.platform, 'mac')
         run: node scripts/swarm-smoke.js mac
+      # Whatever the smoke test saw, kept whether it passed or failed: the
+      # screen, the renderer console, the profile tree and the process output.
+      # A failure should cost one look, not another three-platform cycle.
+      - name: Keep what the smoke test saw
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swarm-smoke-diagnostics-${{ matrix.platform }}
+          path: dist/smoke-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Record build provenance and checksums
         run: |
           git rev-parse HEAD > dist/source-commit.txt
