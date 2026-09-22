@@ -1,6 +1,12 @@
 import InfoClass from "../appstate/classes/InfoClass";
 import FetchErrorClass from "../appstate/classes/FetchErrorClass";
 import { SyncStatusType } from "../appstate/types/SyncStatusType";
+// `serverHost` lives in utils/swarmNetwork, next to the server presets it
+// describes. Re-exported below so this module's existing importers are
+// unaffected.
+import { serverHost } from "../../utils/swarmNetwork";
+
+export { serverHost };
 
 /**
  * What the wallet's connection looks like, said in words a person can act on.
@@ -35,11 +41,6 @@ export type SwarmStatus = {
   host: string;
 };
 
-// `serverHost` now lives in utils/swarmNetwork, next to the server presets it
-// describes; re-exported here so this module's existing importers are
-// unaffected.
-import { serverHost } from "../../utils/swarmNetwork";
-export { serverHost };
 
 
 /** A block height with thousands separators: 812405 -> "812,405". */
