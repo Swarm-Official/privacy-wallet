@@ -37,6 +37,25 @@ describe("deriveStatus", () => {
     expect(status.detail).toBe("No answer from lwd.swarm.green");
   });
 
+  // Defect W-5. Before a wallet exists there is no RPC and so no `info`, but
+  // the profile has had a server since its first run. Claiming "No server
+  // configured" in that window told the first person to open a public download
+  // that the application was broken when it was waiting for them to make a
+  // wallet.
+  it("names the configured server before any wallet has opened", () => {
+    const status = deriveStatus(info({ serverUri: "", latestBlock: 0 }), null, undefined, "https://lwd.swarm.green:443");
+    // Neutral, not an error: nothing has gone wrong, nothing has been tried.
+    expect(status.state).toBe("connecting");
+    expect(status.detail).toBe("Connecting to lwd.swarm.green…");
+    expect(status.host).toBe("lwd.swarm.green");
+  });
+
+  // The one case where "no server configured" is the truth.
+  it("says a server is missing only when there is genuinely none", () => {
+    const status = deriveStatus(info({ serverUri: "", latestBlock: 0 }), null);
+    expect(status.detail).toBe("No server configured");
+  });
+
   it("reports a percentage while it is scanning", () => {
     const status = deriveStatus(info({ serverUri: "https://lwd.swarm.green:443", latestBlock: 12046 }), 42);
     expect(status.state).toBe("syncing");

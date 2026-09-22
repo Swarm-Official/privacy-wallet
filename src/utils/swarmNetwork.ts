@@ -45,15 +45,14 @@ export type SwarmServerPreset = {
 /**
  * The endpoints offered for the project chain, in the order they are shown.
  *
- * The public one is first and is what a fresh profile starts on. It does not
- * answer yet — the server is not deployed — so everything that dials it has to
- * fail with a sentence rather than a stack trace.
+ * The public one is first and is what a fresh profile starts on, with no
+ * choice asked of the user.
  */
 export const SWARM_SERVER_PRESETS: readonly SwarmServerPreset[] = [
   {
     label: "SWARM public server",
     uri: "https://lwd.swarm.green:443",
-    note: "The project's hosted indexer. It is not running yet.",
+    note: "The project's hosted indexer.",
   },
   {
     // 9067 is the light-wallet gRPC port in network/swarm-testnet/manifest.json,
@@ -62,7 +61,7 @@ export const SWARM_SERVER_PRESETS: readonly SwarmServerPreset[] = [
     // dial a node serving a different genesis.
     label: "My own node",
     uri: "http://127.0.0.1:9067",
-    note: "A SwarmTestnet indexer you run on this computer.",
+    note: "Needs a SwarmTestnet indexer running on this computer. The SWARM Node mining app does not include one yet.",
   },
 ];
 
@@ -82,6 +81,28 @@ export const SWARM_NO_AUTOMATIC_REASON =
 
 /** Whether `chain` is the project chain. */
 export const isSwarmChain = (chain: ServerChainNameEnum | "" | undefined): boolean => chain === SWARM_CHAIN;
+
+/**
+ * The host a server URI points at, with the scheme, port and path removed.
+ *
+ * Shown instead of the full URI because the host is the part a person can
+ * recognise, and instead of a peer count because a light wallet has no peers:
+ * it talks to exactly one indexer and knows nothing about the network beyond
+ * what that indexer tells it.
+ */
+export function serverHost(serverUri: string | undefined): string {
+  if (!serverUri) return "";
+  const trimmed = serverUri.trim();
+  if (!trimmed) return "";
+  try {
+    // `new URL` needs a scheme; a bare "host:port" is common in settings.
+    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const { hostname } = new URL(withScheme);
+    return hostname || trimmed;
+  } catch {
+    return trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split(/[/:?#]/)[0] || trimmed;
+  }
+}
 
 /**
  * What to call the chain on a screen that names it — the address book's
@@ -119,26 +140,23 @@ export const maskAmount = (amount: string, ticker: string = SWARM_TICKER): strin
 /**
  * What to say when a server on this chain does not answer.
  *
- * The default preset is the case worth naming: `lwd.swarm.green` is the
- * address the project will host at and does not host at yet, so a fresh
- * install dials something that cannot answer. A transport error would leave
- * the user thinking their wallet is broken; this says what is actually true
- * and what the alternative is.
+ * One sentence, naming the host and what the wallet is doing about it. It
+ * used to announce that the public server "is not running yet", which was
+ * true when it was written and stopped being true on 2026-09-21 — and then
+ * told the first person to try a public download that the network was down
+ * when it was live. A message that explains an outage is a message that has
+ * to be revisited when the outage ends.
  */
 export const swarmUnreachableMessage = (uri: string): string => {
-  const preset = swarmPresetFor(uri);
-  if (preset && preset.uri === SWARM_DEFAULT_SERVER) {
-    return (
-      `${preset.label} (${uri}) did not answer. The project's public server is not running yet. ` +
-      `Choose "My own node" if you are running a ${SWARM_NETWORK_LABEL} indexer on this computer, ` +
-      `or type another address below.`
-    );
+  const host = serverHost(uri) || uri;
+  if (uri === SWARM_DEFAULT_SERVER) {
+    // The server has been live since 2026-09-21. It said "not running yet" for
+    // a day after that stopped being true, which told the first person to try
+    // a public download that the network was down when it was not.
+    return `Can't reach ${host} right now — check your internet connection. The wallet keeps retrying.`;
   }
-  if (preset) {
-    return (
-      `${preset.label} (${uri}) did not answer. Start your ${SWARM_NETWORK_LABEL} node and indexer, ` +
-      `then try again.`
-    );
+  if (swarmPresetFor(uri)) {
+    return `Can't reach ${host} right now — check that your ${SWARM_NETWORK_LABEL} indexer is running.`;
   }
-  return `${uri} did not answer. Check the address, or choose one of the listed servers.`;
+  return `Can't reach ${host} right now — check the address, or choose one of the listed servers.`;
 };

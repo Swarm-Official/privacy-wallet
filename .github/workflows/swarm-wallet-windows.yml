@@ -132,8 +132,16 @@ jobs:
           retention-days: 7
       - name: Package the unsigned test wallet
         run: yarn electron-builder --win zip --x64 --config configs/swarm-testnet-builder.cjs --publish never
+      - name: Record whether the wallet server was reachable from this runner
+        run: node scripts/swarm-reachability.js
       - name: Check the packaged application shows no upstream naming
         run: node scripts/check-swarm-bundle-strings.js --asar dist/win-unpacked --renderer build/static/js
+      # Installs the one-click installer into a throwaway profile, starts what
+      # it installed, proves it looks for a wallet in the same place the
+      # portable build does, and uninstalls. Nothing is installed on the
+      # runner outside that profile and no shortcut outlives it.
+      - name: Smoke-test the installer and the portable build
+        run: node scripts/swarm-smoke-windows.js
       - name: Record build provenance and checksums
         shell: pwsh
         run: |

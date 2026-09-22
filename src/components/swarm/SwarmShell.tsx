@@ -10,7 +10,7 @@ import HiveBee from "../logo/HiveBee";
 import { ContextApp } from "../../context/ContextAppState";
 import routes from "../../constants/routes.json";
 import APP_VERSION from "../../version";
-import { SWARM_NETWORK_LABEL } from "../../utils/swarmNetwork";
+import { SWARM_NETWORK_LABEL, SWARM_DEFAULT_SERVER } from "../../utils/swarmNetwork";
 
 /**
  * The application frame: the hive rail on the left, everything else on the
@@ -78,6 +78,8 @@ type SwarmShellProps = {
 const STATUS_CLASS = {
   synced: styles.statusSynced,
   syncing: styles.statusSyncing,
+  // Neutral, not red: nothing has gone wrong yet.
+  connecting: styles.statusConnecting,
   disconnected: styles.statusDisconnected,
 } as const;
 
@@ -88,7 +90,11 @@ export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry }) => 
   const { info, verificationProgress, syncingStatus, fetchError, readOnly, currentWallet, reopenWallet } =
     useContext(ContextApp);
 
-  const status = deriveStatus(info, verificationProgress, syncingStatus);
+  // The server this profile is set to, which exists from first run whether or
+  // not a wallet does. Without it the header claimed "No server configured"
+  // on every fresh install until the user created a wallet (defect W-5).
+  const configuredServer = currentWallet?.uri || SWARM_DEFAULT_SERVER;
+  const status = deriveStatus(info, verificationProgress, syncingStatus, configuredServer);
   const problem = currentProblem(fetchError, syncingStatus, status.host);
   const active = navForPath(location.pathname);
   const walletReady = !!currentWallet?.id;

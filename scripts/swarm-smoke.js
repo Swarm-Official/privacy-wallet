@@ -15,6 +15,7 @@
 // no wallet is created, no key material exists, and HOME is a throwaway
 // directory that is discarded with the runner.
 const { spawnSync, spawn } = require("child_process");
+const { checkFirstScreen } = require("./swarm-first-screen");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -22,6 +23,8 @@ const path = require("path");
 const PRODUCT = "SWARM Wallet (Testnet)";
 const EXECUTABLE = "SWARM Wallet Testnet";
 const READY = "did-finish-load";
+// A port nothing else on a runner uses, for reading the rendered screen.
+const DEVTOOLS_PORT = 9333;
 const TIMEOUT_MS = 90_000;
 const POLL_MS = 500;
 
@@ -68,7 +71,7 @@ if (platform === "linux") {
   // locked-down host, not of this build, and it is what the README tells a
   // user on 24.04 to do.
   command = "xvfb-run";
-  args = ["-a", appImage, "--no-sandbox"];
+  args = ["-a", appImage, "--no-sandbox", `--remote-debugging-port=${DEVTOOLS_PORT}`];
 } else {
   const app = findUnder(dist, (full, entry) => entry.isDirectory() && full.endsWith(".app"));
   if (!app) throw new Error("no .app in dist");
@@ -76,6 +79,7 @@ if (platform === "linux") {
   if (!fs.existsSync(binary)) throw new Error(`no executable at ${binary}`);
   console.log(`Starting ${path.basename(app)}.`);
   command = binary;
+  args = [`--remote-debugging-port=${DEVTOOLS_PORT}`];
 }
 
 const child = spawn(command, args, {
@@ -114,7 +118,11 @@ const poll = () => {
   if (fs.existsSync(startupLog)) {
     const log = fs.readFileSync(startupLog, "utf8");
     if (log.includes(READY)) {
-      finish(true, `The packaged wallet started and rendered its first screen.\n${log.trim()}`);
+      // Rendered — now read what it rendered.
+      checkFirstScreen(DEVTOOLS_PORT).then(
+        () => finish(true, `The packaged wallet started and its first screen names the configured server.\n${log.trim()}`),
+        (error) => finish(false, `The first screen is wrong: ${error.message}`),
+      );
       return;
     }
   }

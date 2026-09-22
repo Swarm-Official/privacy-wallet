@@ -1,4 +1,14 @@
+const fs = require("fs");
+const path = require("path");
+
 const upstream = require("../package.json").build;
+
+// The version every artifact is named after, read from the single place the
+// application already states it. package.json still carries upstream's
+// 2.0.26, which is how the first packages came out named "2.0.26" — a number
+// that says nothing about which SWARM build someone downloaded.
+const versionSource = fs.readFileSync(path.join(__dirname, "../src/version.ts"), "utf8");
+const VERSION = /const APP_VERSION = "([^"]+)"/.exec(versionSource)[1];
 
 // Packaging for the SwarmTestnet wallet: unsigned, portable test builds for
 // Windows, Linux and macOS. It changes identity, artwork and what the
@@ -31,8 +41,9 @@ module.exports = {
   productName: PRODUCT,
   executableName: EXECUTABLE,
   appId: "green.swarm.wallet.testnet",
-  artifactName: "SWARM-Wallet-Testnet-${version}-${arch}.${ext}",
+  artifactName: "SWARM-Wallet-${version}-${arch}.${ext}",
   extraMetadata: {
+    version: VERSION,
     main: "build/electron.js",
     name: "swarm-wallet-testnet",
     productName: PRODUCT,
@@ -46,7 +57,7 @@ module.exports = {
   win: {
     ...upstream.win,
     icon: "./resources/swarm/icon.ico",
-    target: ["zip"],
+    target: ["zip", "nsis"],
     azureSignOptions: null,
     // True so electron-builder rewrites the executable's version resource —
     // without it the file's Properties dialog keeps Electron's own
@@ -58,6 +69,26 @@ module.exports = {
     signExts: [],
     protocols: [],
     extraResources: [...upstream.win.extraResources, ...licences],
+  },
+  // A single file a person double-clicks. The portable zip stays — it is
+  // what someone who will not run an unsigned installer can still inspect
+  // and unpack — but unzipping eighty files of Chromium runtime and being
+  // asked to find the right .exe among them is not an installation.
+  //
+  // Per-user, so there is no administrator prompt on top of the SmartScreen
+  // one; no directory chooser, because oneClick means there are no
+  // questions; and the wallet is left alone on uninstall, because the
+  // application is replaceable and the coins are not.
+  nsis: {
+    oneClick: true,
+    perMachine: false,
+    allowToChangeInstallationDirectory: false,
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: PRODUCT,
+    runAfterFinish: true,
+    deleteAppDataOnUninstall: false,
+    artifactName: "SWARM-Wallet-${version}-win-x64-setup.${ext}",
   },
   linux: {
     ...upstream.linux,
@@ -92,11 +123,11 @@ module.exports = {
     ...upstream.deb,
     afterInstall: "scripts/swarm-deb-postinstall.sh",
     afterRemove: "scripts/swarm-deb-postremove.sh",
-    artifactName: "swarm-wallet-testnet_${version}_${arch}.${ext}",
+    artifactName: "SWARM-Wallet-${version}-${arch}.${ext}",
   },
   appImage: {
     ...upstream.appImage,
-    artifactName: "SWARM-Wallet-Testnet-${version}-${arch}.${ext}",
+    artifactName: "SWARM-Wallet-${version}-${arch}.${ext}",
   },
   mac: {
     ...upstream.mac,
@@ -124,7 +155,7 @@ module.exports = {
   },
   dmg: {
     ...upstream.dmg,
-    artifactName: "SWARM-Wallet-Testnet-${version}-${arch}.${ext}",
+    artifactName: "SWARM-Wallet-${version}-${arch}.${ext}",
   },
   // The App Store target has no meaning without an Apple account, and leaving
   // it configured invites an accidental `--mas` build that fails late.

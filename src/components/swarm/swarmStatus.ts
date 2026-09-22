@@ -21,7 +21,7 @@ import { SyncStatusType } from "../appstate/types/SyncStatusType";
  */
 
 /** The three states a person needs to tell apart. */
-export type SwarmConnectionState = "synced" | "syncing" | "disconnected";
+export type SwarmConnectionState = "synced" | "syncing" | "connecting" | "disconnected";
 
 export type SwarmStatus = {
   state: SwarmConnectionState;
@@ -35,27 +35,12 @@ export type SwarmStatus = {
   host: string;
 };
 
-/**
- * The host a server URI points at, with the scheme, port and path removed.
- *
- * Shown instead of the full URI because the host is the part a person can
- * recognise, and instead of a peer count because a light wallet has no peers:
- * it talks to exactly one indexer and knows nothing about the network beyond
- * what that indexer tells it.
- */
-export function serverHost(serverUri: string | undefined): string {
-  if (!serverUri) return "";
-  const trimmed = serverUri.trim();
-  if (!trimmed) return "";
-  try {
-    // `new URL` needs a scheme; a bare "host:port" is common in settings.
-    const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    const { hostname } = new URL(withScheme);
-    return hostname || trimmed;
-  } catch {
-    return trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split(/[/:?#]/)[0] || trimmed;
-  }
-}
+// `serverHost` now lives in utils/swarmNetwork, next to the server presets it
+// describes; re-exported here so this module's existing importers are
+// unaffected.
+import { serverHost } from "../../utils/swarmNetwork";
+export { serverHost };
+
 
 /** A block height with thousands separators: 812405 -> "812,405". */
 export function formatHeight(height: number): string {
@@ -74,15 +59,38 @@ export function deriveStatus(
   info: InfoClass,
   verificationProgress: number | null,
   syncingStatus?: SyncStatusType,
+  configuredServer?: string,
 ): SwarmStatus {
-  const host = serverHost(info?.serverUri);
+  // `info` is filled in by the wallet's own RPC, which only runs once a wallet
+  // is open. Before then there is no server *answer* — but there is a server,
+  // written into this profile on first run. Saying "No server configured" in
+  // that window was untrue and read, to the first person who tried the public
+  // download, as a broken application (defect W-5). `configuredServer` is what
+  // the profile actually holds, so the wallet can say which server it will use
+  // before it has had a chance to use it.
+  const host = serverHost(info?.serverUri) || serverHost(configuredServer);
   const height = info?.latestBlock ?? 0;
 
   if (!height) {
+    // Three different situations, and they are not the same thing to a person.
+    //
+    // No `info.serverUri` means the wallet has not tried yet — there is no
+    // open wallet, so no RPC has run. That is the state a fresh profile sits
+    // in while the user reads the welcome screen, and showing them a red dot
+    // and "Not connected" is how the first public download looked broken
+    // (defect W-5). It is "connecting", and it is not an error.
+    //
+    // A server URI with no height means the wallet did try and got nothing
+    // back. That is a genuine failure and keeps the red dot.
+    if (!serverHost(info?.serverUri)) {
+      return host
+        ? { state: "connecting", label: "Connecting", detail: `Connecting to ${host}…`, percent: null, host }
+        : { state: "disconnected", label: "Not connected", detail: "No server configured", percent: null, host };
+    }
     return {
       state: "disconnected",
       label: "Not connected",
-      detail: host ? `No answer from ${host}` : "No server configured",
+      detail: `No answer from ${host}`,
       percent: null,
       host,
     };

@@ -42,23 +42,32 @@ describe("the servers offered for this chain", () => {
     expect(swarmPresetFor("https://somewhere.example:443")).toBeUndefined();
   });
 
-  // The default is an address the project will host at and does not host at
-  // yet, so this is the first thing a new install meets when it cannot reach
-  // it. It has to say that, not "connection refused".
-  it("says the public server is not running rather than blaming the wallet", () => {
+  // It names the host and says what the wallet is doing, and nothing else.
+  // It used to announce that the public server "is not running yet" — true
+  // when written, false from 2026-09-21, and by then it was telling people the
+  // network was down while it was live.
+  it("names the host and says the wallet keeps trying", () => {
     const said = swarmUnreachableMessage(SWARM_DEFAULT_SERVER);
-    expect(said).toContain("public server is not running yet");
-    expect(said).toContain("My own node");
-    expect(said).toContain(SWARM_DEFAULT_SERVER);
+    expect(said).toContain("lwd.swarm.green");
+    expect(said).toContain("keeps retrying");
+    expect(said).not.toMatch(/not running|not deployed|not live/i);
   });
 
-  it("tells someone running their own node to start it", () => {
+  it("points someone on their own node at their own indexer", () => {
     const said = swarmUnreachableMessage(SWARM_SERVER_PRESETS[1].uri);
-    expect(said).toContain("Start your SWARM Testnet node and indexer");
+    expect(said).toContain("127.0.0.1");
+    expect(said).toContain("indexer is running");
   });
 
   it("names a typed server rather than a preset that does not exist", () => {
-    expect(swarmUnreachableMessage("http://127.0.0.1:1234")).toContain("http://127.0.0.1:1234");
+    expect(swarmUnreachableMessage("http://127.0.0.1:1234")).toContain("127.0.0.1");
+  });
+
+  // Every preset's note has to stay true as the network changes around it.
+  it("promises nothing about a server being absent", () => {
+    for (const preset of SWARM_SERVER_PRESETS) {
+      expect(preset.note).not.toMatch(/not running|not deployed|not live/i);
+    }
   });
 });
 

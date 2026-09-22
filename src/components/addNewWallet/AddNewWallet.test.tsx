@@ -329,9 +329,9 @@ describe("AddNewWallet on the project chain", () => {
     expect(screen.getByLabelText("Custom server URI")).toHaveValue("http://127.0.0.1:1234");
   });
 
-  // The default preset is an address the project will host at and does not
-  // host at yet, so this is the first thing a new install meets.
-  it("says the public server is not running rather than failing at the transport", async () => {
+  // A server that does not answer is a sentence naming the host, not a
+  // transport error and not a claim about why.
+  it("says which host it cannot reach rather than failing at the transport", async () => {
     storedSettings();
     const openErrorModal = jest.fn();
     render(<AddNewWallet {...baseProps} />, {
@@ -345,8 +345,8 @@ describe("AddNewWallet on the project chain", () => {
 
     await waitFor(() => expect(openErrorModal).toHaveBeenCalled());
     const said = openErrorModal.mock.calls.map((call) => call[1]).join(" ");
-    expect(said).toContain("public server is not running yet");
-    expect(said).toContain(SWARM_DEFAULT_SERVER);
+    expect(said).toContain("keeps retrying");
+    expect(said).toContain("lwd.swarm.green");
     // Creation never started: naming the next wallet file is its first step.
     expect(native.wallet_exists).not.toHaveBeenCalled();
   });

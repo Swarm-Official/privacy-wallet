@@ -170,6 +170,15 @@
   animation: swarmPulse 1.2s ease-in-out infinite;
 }
 
+/* Waiting to try, which is not a failure. Muted rather than red or green so
+   it reads as "nothing yet" instead of "something is wrong". */
+.statusConnecting {
+  color: var(--swarm-text-muted);
+}
+.statusConnecting .statusDot {
+  background: var(--swarm-text-faint);
+}
+
 .statusDisconnected {
   color: var(--swarm-red);
 }

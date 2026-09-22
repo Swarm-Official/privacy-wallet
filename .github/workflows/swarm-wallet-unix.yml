@@ -121,6 +121,8 @@ jobs:
         run: node scripts/check-swarm-bundle-strings.js --renderer build/static/js
       - name: Package the unsigned test wallet
         run: yarn electron-builder ${{ matrix.electron_flags }} --config configs/swarm-testnet-builder.cjs --publish never
+      - name: Record whether the wallet server was reachable from this runner
+        run: node scripts/swarm-reachability.js
       - name: Check the packaged application shows no upstream naming
         run: node scripts/check-swarm-bundle-strings.js --asar dist --renderer build/static/js
       # A package nobody has started is a guess. These do not go past the
