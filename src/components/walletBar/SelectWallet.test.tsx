@@ -74,7 +74,7 @@ describe("SelectWallet on the project chain", () => {
     const option = screen.getByRole("option", { name: /My SWARM wallet/ });
     expect(option).toBeInTheDocument();
     expect(option.textContent).toContain("✔");
-    expect(screen.getByRole("combobox").querySelector('optgroup[label="SWARM TESTNET"]')).not.toBeNull();
+    expect(screen.getByRole("group", { name: "SWARM TESTNET" })).toBeInTheDocument();
   });
 
   it("lists three wallets and ticks only the open one", () => {
@@ -137,6 +137,6 @@ describe("SelectWallet on the project chain", () => {
     });
 
     expect(screen.getByRole("option", { name: /Future net/ })).toBeInTheDocument();
-    expect(screen.getByRole("combobox").querySelector('optgroup[label="SOME-FUTURE-NET"]')).not.toBeNull();
+    expect(screen.getByRole("group", { name: "SOME-FUTURE-NET" })).toBeInTheDocument();
   });
 });

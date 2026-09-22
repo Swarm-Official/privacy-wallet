@@ -5,6 +5,11 @@ import { ValueTransferStatusEnum } from "../enums/ValueTransferStatusEnum";
 export default class ValueTransferClass {
   type: ValueTransferKindEnum;
   fee?: number;
+  // A mined block reward. Transaction-level, like `fee`: every value
+  // transfer of a txid carries the same answer. Nothing can infer this —
+  // a reward and a memo-less payment look identical — so it is only ever
+  // true when the SDK said so.
+  isCoinbase?: boolean;
   confirmations: number;
   blockheight: number;
   status: ValueTransferStatusEnum;
