@@ -1,0 +1,182 @@
+import React, { ReactNode, useContext } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import styles from "./Swarm.module.css";
+import { SwarmIcon, SwarmIconName } from "./SwarmIcons";
+import { SwarmProblemBar } from "./SwarmProblem";
+import { SwarmWalletMenu } from "./SwarmWalletMenu";
+import SwarmUiContext from "./SwarmUiContext";
+import { currentProblem, deriveStatus } from "./swarmStatus";
+import HiveBee from "../logo/HiveBee";
+import { ContextApp } from "../../context/ContextAppState";
+import routes from "../../constants/routes.json";
+import APP_VERSION from "../../version";
+import { SWARM_NETWORK_LABEL } from "../../utils/swarmNetwork";
+
+/**
+ * The application frame: the hive rail on the left, everything else on the
+ * right.
+ *
+ * The screens it wraps are the mockup's six — Overview, Send, Receive,
+ * Activity, Addresses, Settings — which is the old app's seven with Messages
+ * folded into Activity as a filter (memos are a property of a transfer, not a
+ * separate inbox) and the Address Book joined to the wallet's own addresses
+ * under one heading.
+ */
+
+export type SwarmScreenId = "overview" | "send" | "receive" | "activity" | "addresses" | "settings";
+
+type NavEntry = {
+  id: SwarmScreenId;
+  label: string;
+  icon: SwarmIconName;
+  route: string;
+  kicker: string;
+  title: string;
+};
+
+export const SWARM_NAV: NavEntry[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    icon: "overview",
+    route: routes.DASHBOARD,
+    kicker: "ACCOUNT",
+    title: "Overview",
+  },
+  { id: "send", label: "Send", icon: "send", route: routes.SEND, kicker: "TRANSFER", title: "Send SWM" },
+  { id: "receive", label: "Receive", icon: "receive", route: routes.RECEIVE, kicker: "INCOMING", title: "Receive SWM" },
+  { id: "activity", label: "Activity", icon: "activity", route: routes.HISTORY, kicker: "HISTORY", title: "Activity" },
+  {
+    id: "addresses",
+    label: "Addresses",
+    icon: "addresses",
+    route: routes.ADDRESSBOOK,
+    kicker: "ADDRESSES & CONTACTS",
+    title: "Addresses",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: "settings",
+    route: routes.SETTINGS,
+    kicker: "PREFERENCES",
+    title: "Settings",
+  },
+];
+
+export function navForPath(pathname: string): NavEntry {
+  const match = SWARM_NAV.find((n) => pathname.toLowerCase().startsWith(n.route.toLowerCase()));
+  return match ?? SWARM_NAV[0];
+}
+
+type SwarmShellProps = {
+  children: ReactNode;
+  /** Re-runs the sync the app would have run anyway, now. */
+  onRetry: () => void;
+};
+
+const STATUS_CLASS = {
+  synced: styles.statusSynced,
+  syncing: styles.statusSyncing,
+  disconnected: styles.statusDisconnected,
+} as const;
+
+export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { hidden, toggleHidden } = useContext(SwarmUiContext);
+  const { info, verificationProgress, syncingStatus, fetchError, readOnly, currentWallet, reopenWallet } =
+    useContext(ContextApp);
+
+  const status = deriveStatus(info, verificationProgress, syncingStatus);
+  const problem = currentProblem(fetchError, syncingStatus, status.host);
+  const active = navForPath(location.pathname);
+  const walletReady = !!currentWallet?.id;
+
+  return (
+    <div className={styles.shell}>
+      <nav className={styles.rail} aria-label="Wallet sections">
+        <div className={styles.brand}>
+          <HiveBee size={28} background="var(--swarm-surface-sunken)" />
+          <div className={styles.brandName}>SWARM</div>
+        </div>
+
+        <SwarmWalletMenu reopenWallet={reopenWallet} />
+
+        {SWARM_NAV.map((entry) => {
+          // Send needs a wallet that can spend. The others are readable on a
+          // watch-only wallet, and hiding them would leave a rail with one item.
+          const disabled = entry.id === "send" && (!walletReady || readOnly);
+          const isActive = entry.id === active.id;
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+              aria-current={isActive ? "page" : undefined}
+              disabled={disabled}
+              style={disabled ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+              onClick={() => navigate(entry.route)}
+            >
+              <SwarmIcon name={entry.icon} />
+              {entry.label}
+            </button>
+          );
+        })}
+
+        <div className={styles.railFoot}>
+          <div className={`${styles.statusChip} ${STATUS_CLASS[status.state]}`}>
+            <div className={styles.statusHead}>
+              <span className={styles.statusDot} />
+              {status.label.toUpperCase()}
+            </div>
+            <div className={styles.statusDetail}>{status.detail}</div>
+          </div>
+          <div className={styles.versionLine}>
+            SWARM Wallet {APP_VERSION}
+            <br />
+            {SWARM_NETWORK_LABEL}
+          </div>
+        </div>
+      </nav>
+
+      <main className={styles.main}>
+        <div className={styles.topBar}>
+          <div>
+            <div className={styles.kicker}>{active.kicker}</div>
+            <h1 className={styles.screenTitle}>{active.title}</h1>
+          </div>
+          <div className={styles.topActions}>
+            <button type="button" className={styles.pillButton} onClick={toggleHidden} aria-pressed={hidden}>
+              <SwarmIcon name={hidden ? "eye" : "eyeOff"} size={15} />
+              {hidden ? "Show balances" : "Hide balances"}
+            </button>
+            {/*
+              The mockup's privacy switch is a toggle. It is an indicator here:
+              this network has no way to send a public payment from a shielded
+              balance on purpose, so a switch that claimed to turn privacy off
+              would be a control over something the wallet does not do. What is
+              true — that every payment out of the shielded pool is shielded —
+              is what it says.
+            */}
+            <div className={styles.privacyPill} title="Every payment from your shielded balance is private.">
+              <div style={{ textAlign: "right" }}>
+                <div className={styles.privacyTag}>SHIELDED BY DEFAULT</div>
+                <div className={styles.privacySub}>Sender, recipient and amount are hidden</div>
+              </div>
+              <span style={{ color: "var(--swarm-orange)", display: "flex" }}>
+                <SwarmIcon name="shield" size={18} />
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <SwarmProblemBar problem={problem} onRetry={onRetry} />
+
+        {children}
+      </main>
+    </div>
+  );
+};
+
+export default SwarmShell;

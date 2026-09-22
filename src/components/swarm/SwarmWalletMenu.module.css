@@ -1,0 +1,146 @@
+.root {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+  color: var(--swarm-text);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.trigger:hover {
+  border-color: var(--swarm-orange-edge);
+}
+
+.triggerText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.triggerKicker {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--swarm-text-dim);
+}
+
+.triggerName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--swarm-text-muted);
+  flex: none;
+  font-size: 12px;
+}
+
+.menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 210px;
+  padding: 6px;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--swarm-orange-edge);
+  background: #1b1713;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.7);
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.groupLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--swarm-text-dim);
+  padding: 8px 10px 4px;
+}
+
+.groupEmpty {
+  font-size: 12px;
+  color: var(--swarm-text-faint);
+  padding: 10px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-s);
+  border: none;
+  background: none;
+  color: var(--swarm-text-soft);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.item:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.itemActive {
+  color: var(--swarm-text);
+  background: var(--swarm-orange-wash);
+}
+
+.tick {
+  width: 14px;
+  flex: none;
+  color: var(--swarm-orange);
+  font-size: 12px;
+  text-align: center;
+}
+
+.itemMain {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemNote {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--swarm-text-faint);
+  margin-top: 2px;
+}
+
+.sep {
+  height: 1px;
+  background: var(--swarm-hairline);
+  margin: 6px 4px;
+}

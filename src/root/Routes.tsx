@@ -4,7 +4,6 @@ import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { ErrorModal } from "../components/errorModal";
 import cstyles from "../components/common/Common.module.css";
 import routes from "../constants/routes.json";
-import { Dashboard } from "../components/dashboard";
 import { Insight } from "../components/insight";
 import { Send, SendManyJsonType } from "../components/send";
 import { Receive } from "../components/receive";
@@ -35,7 +34,6 @@ import selectFastestServer from "../utils/selectFastestServer";
 import { AddNewWallet } from "../components/addNewWallet";
 import { AddressBook, AddressbookImpl } from "../components/addressBook";
 import { Sidebar } from "../components/sideBar";
-import { WalletBar } from "../components/walletBar";
 import { History } from "../components/history";
 import { Swap } from "../components/swap";
 import type { SwapDirectionEnum } from "../swap/enums/SwapDirectionEnum";
@@ -55,6 +53,10 @@ import ShieldResultContent from "./ShieldResultContent";
 import LockScreen from "../components/lockScreen/LockScreen";
 import AppSecurityModal from "../components/appSecurity/AppSecurityModal";
 import ImportDataModal, { ImportScanResult } from "../components/importData/ImportDataModal";
+import { SwarmShell } from "../components/swarm/SwarmShell";
+import { SwarmUiProvider } from "../components/swarm/SwarmUiContext";
+import { OverviewScreen } from "../components/swarm/screens/OverviewScreen";
+import { SettingsScreen } from "../components/swarm/screens/SettingsScreen";
 
 const { ipcRenderer } = window.electronAPI;
 
@@ -635,6 +637,14 @@ const AppRoutes: React.FC = () => {
     });
   }, [openConfirmModal]);
 
+  // What the shell's Retry button runs: the ordinary sync, now, instead of at
+  // the next tick of the poller. Not a rescan — a server that was briefly
+  // unreachable does not need the chain read again from the birthday, and
+  // offering that behind a button labelled "Retry" would be a trap.
+  const runRPCRetrySync = useCallback(() => {
+    rpcRef.current?.refreshSync(false);
+  }, []);
+
   const runRPCSendTransaction = useCallback(async (sendJson: SendManyJsonType[]): Promise<string> => {
     try {
       const result: string = await rpcRef.current!.sendTransaction(sendJson);
@@ -797,84 +807,96 @@ const AppRoutes: React.FC = () => {
         chainName={currentWallet?.chain_name ?? ServerChainNameEnum.mainChainName}
         enabled={!!currentWallet && !currentWalletOpenError && location.pathname !== routes.LOADING}
       >
-        <div style={{ overflow: "hidden" }}>
-          {location.pathname !== "/" && !location.pathname.toLowerCase().includes("zingo") && (
-            <div className={cstyles.sidebarcontainer}>
-              <Sidebar doRescan={runRPCRescan} />
-            </div>
-          )}
+        <SwarmUiProvider>
+          {/*
+            The old sidebar, kept mounted and out of sight.
 
-          <div className={cstyles.contentcontainer}>
-            {/* Above the routes rather than inside any of them: the wallet you
-                are in and the server it talks to are true of every screen, and
-                the server line had already been pasted into five of them
-                separately. It hides itself when there is no wallet. */}
-            {location.pathname !== routes.LOADING && !location.pathname.toLowerCase().includes("zingo") && (
-              <WalletBar navigateToLoadingScreenChangingWallet={navigateToLoadingScreenChangingWallet} />
-            )}
-            <Routes>
-              <Route
-                path={routes.SEND}
-                element={
-                  <Send
-                    sendTransaction={runRPCSendTransaction}
-                    setSendPageState={setSendPageState}
-                    addAddressBookEntry={addAddressBookEntry}
-                  />
-                }
-              />
-              <Route path={routes.RECEIVE} element={<Receive />} />
-              <Route
-                path={routes.ADDRESSBOOK}
-                element={
-                  <AddressBook
-                    addAddressBookEntry={addAddressBookEntry}
-                    removeAddressBookEntry={removeAddressBookEntry}
-                  />
-                }
-              />
-              <Route path={routes.DASHBOARD} element={<Dashboard navigateToHistory={navigateToHistory} />} />
-              <Route path={routes.INSIGHT} element={<Insight />} />
-              <Route path={routes.HISTORY} element={<History />} />
-              <Route
-                path={routes.SWAP}
-                element={<Swap sendSwapDeposit={runRPCSendSwapDeposit} addAddressBookEntry={addAddressBookEntry} />}
-              />
-              <Route path={routes.MESSAGES} element={<Messages />} />
-              <Route path={routes.MIGRATION} element={<OrchardMigration drainToIronwood={runRPCDrainToIronwood} />} />
-              <Route
-                path={routes.ADDNEWWALLET}
-                element={
-                  <AddNewWallet
-                    closeModal={navigateToDashboard}
-                    setWallets={setWallets}
-                    setCurrentWallet={setCurrentWallet}
-                    navigateToLoadingScreenChangingWallet={navigateToLoadingScreenChangingWallet}
-                    doSaveWallet={() => RPC.doSave()}
-                    clearTimers={() => rpcRef.current?.clearTimers() ?? Promise.resolve()}
-                  />
-                }
-              />
-              <Route
-                path={routes.LOADING}
-                element={
-                  <LoadingScreen
-                    runRPCConfigure={() => rpcRef.current?.configure()}
-                    setInfo={setInfo}
-                    setReadOnly={setReadOnly}
-                    navigateToDashboard={navigateToDashboard}
-                    setBirthday={setBirthday}
-                    setPools={setPools}
-                    setWallets={setWallets}
-                    setCurrentWallet={setCurrentWallet}
-                    setCurrentWalletOpenError={setCurrentWalletOpenError}
-                    setFetchError={setFetchError}
-                  />
-                }
-              />
-            </Routes>
+            Nothing in it is drawn any more — the rail replaced it — but it is
+            where the native menu's handlers are registered (rescan, pay URI,
+            export, the wallet menu items), and where three modals live. Its
+            modals portal to the document body, so hiding the element hides the
+            sidebar and not them. Unmounting it would silently break every menu
+            item in the application; moving the handlers out is a change to
+            logic this one is not making.
+          */}
+          <div style={{ display: "none" }} aria-hidden="true">
+            <Sidebar doRescan={runRPCRescan} />
           </div>
-        </div>
+
+          {location.pathname === routes.LOADING || location.pathname === routes.ADDNEWWALLET ? (
+            // Opening a wallet and adding one are the two screens that exist
+            // before there is a wallet to frame. They take the whole window.
+            <div className={cstyles.contentcontainer} style={{ left: 0, width: "100vw" }}>
+              <Routes>
+                <Route
+                  path={routes.ADDNEWWALLET}
+                  element={
+                    <AddNewWallet
+                      closeModal={navigateToDashboard}
+                      setWallets={setWallets}
+                      setCurrentWallet={setCurrentWallet}
+                      navigateToLoadingScreenChangingWallet={navigateToLoadingScreenChangingWallet}
+                      doSaveWallet={() => RPC.doSave()}
+                      clearTimers={() => rpcRef.current?.clearTimers() ?? Promise.resolve()}
+                    />
+                  }
+                />
+                <Route
+                  path={routes.LOADING}
+                  element={
+                    <LoadingScreen
+                      runRPCConfigure={() => rpcRef.current?.configure()}
+                      setInfo={setInfo}
+                      setReadOnly={setReadOnly}
+                      navigateToDashboard={navigateToDashboard}
+                      setBirthday={setBirthday}
+                      setPools={setPools}
+                      setWallets={setWallets}
+                      setCurrentWallet={setCurrentWallet}
+                      setCurrentWalletOpenError={setCurrentWalletOpenError}
+                      setFetchError={setFetchError}
+                    />
+                  }
+                />
+              </Routes>
+            </div>
+          ) : (
+            <SwarmShell onRetry={runRPCRetrySync}>
+              <Routes>
+                <Route path={routes.DASHBOARD} element={<OverviewScreen />} />
+                <Route path={routes.SETTINGS} element={<SettingsScreen />} />
+                <Route
+                  path={routes.SEND}
+                  element={
+                    <Send
+                      sendTransaction={runRPCSendTransaction}
+                      setSendPageState={setSendPageState}
+                      addAddressBookEntry={addAddressBookEntry}
+                    />
+                  }
+                />
+                <Route path={routes.RECEIVE} element={<Receive />} />
+                <Route
+                  path={routes.ADDRESSBOOK}
+                  element={
+                    <AddressBook
+                      addAddressBookEntry={addAddressBookEntry}
+                      removeAddressBookEntry={removeAddressBookEntry}
+                    />
+                  }
+                />
+                <Route path={routes.INSIGHT} element={<Insight />} />
+                <Route path={routes.HISTORY} element={<History />} />
+                <Route
+                  path={routes.SWAP}
+                  element={<Swap sendSwapDeposit={runRPCSendSwapDeposit} addAddressBookEntry={addAddressBookEntry} />}
+                />
+                <Route path={routes.MESSAGES} element={<Messages />} />
+                <Route path={routes.MIGRATION} element={<OrchardMigration drainToIronwood={runRPCDrainToIronwood} />} />
+              </Routes>
+            </SwarmShell>
+          )}
+        </SwarmUiProvider>
       </SwapServiceProvider>
     </ContextAppProvider>
   );

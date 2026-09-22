@@ -156,19 +156,23 @@
 
 .versionLine {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 9.5px;
+  line-height: 1.7;
+  letter-spacing: 0.06em;
   color: var(--swarm-text-disabled);
   padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------------------------------------------------------------- main --- */
 
 .main {
-  padding: 24px 30px 30px;
+  padding: 20px 26px 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
@@ -337,7 +341,7 @@ details[open] > .detailsSummary::before {
 
 .balanceCard {
   position: relative;
-  padding: 26px 30px;
+  padding: 20px 26px;
   border-radius: 18px;
   border: 1px solid var(--swarm-orange-edge);
   background: linear-gradient(160deg, rgba(255, 138, 31, 0.14), #15110d 60%);
@@ -395,9 +399,9 @@ details[open] > .detailsSummary::before {
 .balanceValue {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 52px;
+  font-size: 46px;
   letter-spacing: -0.03em;
-  margin-top: 12px;
+  margin-top: 10px;
   line-height: 1;
   word-break: break-all;
 }
@@ -418,7 +422,7 @@ details[open] > .detailsSummary::before {
 .actionRow {
   display: flex;
   gap: 10px;
-  margin-top: 22px;
+  margin-top: 18px;
   flex-wrap: wrap;
 }
 
@@ -567,9 +571,9 @@ details[open] > .detailsSummary::before {
 .panelGrid {
   display: grid;
   grid-template-columns: 1.25fr 1fr;
-  gap: 18px;
+  gap: 14px;
   flex: 1;
-  min-height: 0;
+  min-height: 260px;
 }
 
 .panel {
@@ -668,14 +672,18 @@ details[open] > .detailsSummary::before {
 .rowMain {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .rowTitle {
+  display: block;
   font-size: 13.5px;
   font-weight: 500;
 }
 
 .rowMeta {
+  display: block;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--swarm-text-faint);
@@ -686,13 +694,18 @@ details[open] > .detailsSummary::before {
 }
 
 .rowRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   text-align: right;
   flex: none;
 }
 
 .rowAmount {
+  display: block;
   font-family: var(--font-mono);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .rowAmountIn {
