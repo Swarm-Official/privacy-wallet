@@ -53,17 +53,25 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
 }) => {
   const location = useLocation();
   let mode: "addnew" | "settings" | "delete" = "addnew";
+  // `restore` says the user arrived by asking to restore rather than to create,
+  // so the type picker opens on the seed phrase instead of on a new wallet.
+  // Which tab opens first is all it decides; every path below is unchanged.
+  let arrivedToRestore = false;
   if (location.state) {
     const locationState = location.state as {
       mode: "addnew" | "settings" | "delete";
+      restore?: boolean;
     };
     mode = locationState.mode;
+    arrivedToRestore = locationState.restore === true;
   }
   const context = useContext(ContextApp);
   const { openErrorModal, closeErrorModal, openConfirmModal, currentWallet, wallets, currentWalletOpenError } = context;
   const swapService = useSwapService();
 
-  const [newWalletType, setNewWalletType] = useState<"new" | "seed" | "ufvk" | "file">("new");
+  const [newWalletType, setNewWalletType] = useState<"new" | "seed" | "ufvk" | "file">(
+    arrivedToRestore ? "seed" : "new",
+  );
   const [seedPhrase, setSeedPhrase] = useState<string>("");
   const [birthday, setBirthday] = useState<string>("");
   const [ufvk, setUfvk] = useState<string>("");
@@ -1064,7 +1072,9 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                 <option value="main">{Utils.chainDisplayName(ServerChainNameEnum.mainChainName)}</option>
                 <option value="test">{Utils.chainDisplayName(ServerChainNameEnum.testChainName)}</option>
                 <option value="regtest">{Utils.chainDisplayName(ServerChainNameEnum.regtestChainName)}</option>
-                <option value="swarm-testnet">{Utils.chainDisplayName(ServerChainNameEnum.swarmTestnetChainName)}</option>
+                <option value="swarm-testnet">
+                  {Utils.chainDisplayName(ServerChainNameEnum.swarmTestnetChainName)}
+                </option>
               </select>
             </div>
           </div>
@@ -1283,54 +1293,55 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                         </select>
                       </div>
                     )}
-                    {!isSwarmChain(selectedChain) && servers.filter((s) => s.chain_name === selectedChain).length > 0 && (
-                      <div className={cstyles.horizontalflex} style={{ margin: "5px 10px", alignItems: "center" }}>
-                        <input
-                          checked={selectedSelection === ServerSelectionEnum.list}
-                          style={{ accentColor: "var(--color-primary)" }}
-                          type="radio"
-                          name="selection"
-                          aria-label="From the list"
-                          value={ServerSelectionEnum.list}
-                          onClick={() => {
-                            setSelectedSelection(ServerSelectionEnum.list);
-                            const ls: string = servers.filter((s) => s.chain_name === selectedChain)[0].uri;
-                            setListServer(ls);
-                            setSelectedServer(ls);
-                          }}
-                          onChange={() => {
-                            setSelectedSelection(ServerSelectionEnum.list);
-                            const ls: string = servers.filter((s) => s.chain_name === selectedChain)[0].uri;
-                            setListServer(ls);
-                            setSelectedServer(ls);
-                          }}
-                        />
-                        List
-                        <select
-                          aria-label="Server list"
-                          disabled={selectedSelection !== "list"}
-                          className={cstyles.fieldselect}
-                          style={{ marginLeft: "20px" }}
-                          value={listServer}
-                          onChange={(e) => {
-                            setListServer(e.target.value);
-                            setSelectedServer(e.target.value);
-                          }}
-                        >
-                          <option key="" value="" disabled hidden></option>
-                          {servers
-                            .filter((s) => s.chain_name === selectedChain)
-                            .map((s: ServerClass) => (
-                              <option key={s.uri} value={s.uri}>
-                                {s.uri +
-                                  " - " +
-                                  Utils.chainDisplayName(s.chain_name) +
-                                  (s.latency ? " _ " + s.latency + " ms." : "")}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    )}
+                    {!isSwarmChain(selectedChain) &&
+                      servers.filter((s) => s.chain_name === selectedChain).length > 0 && (
+                        <div className={cstyles.horizontalflex} style={{ margin: "5px 10px", alignItems: "center" }}>
+                          <input
+                            checked={selectedSelection === ServerSelectionEnum.list}
+                            style={{ accentColor: "var(--color-primary)" }}
+                            type="radio"
+                            name="selection"
+                            aria-label="From the list"
+                            value={ServerSelectionEnum.list}
+                            onClick={() => {
+                              setSelectedSelection(ServerSelectionEnum.list);
+                              const ls: string = servers.filter((s) => s.chain_name === selectedChain)[0].uri;
+                              setListServer(ls);
+                              setSelectedServer(ls);
+                            }}
+                            onChange={() => {
+                              setSelectedSelection(ServerSelectionEnum.list);
+                              const ls: string = servers.filter((s) => s.chain_name === selectedChain)[0].uri;
+                              setListServer(ls);
+                              setSelectedServer(ls);
+                            }}
+                          />
+                          List
+                          <select
+                            aria-label="Server list"
+                            disabled={selectedSelection !== "list"}
+                            className={cstyles.fieldselect}
+                            style={{ marginLeft: "20px" }}
+                            value={listServer}
+                            onChange={(e) => {
+                              setListServer(e.target.value);
+                              setSelectedServer(e.target.value);
+                            }}
+                          >
+                            <option key="" value="" disabled hidden></option>
+                            {servers
+                              .filter((s) => s.chain_name === selectedChain)
+                              .map((s: ServerClass) => (
+                                <option key={s.uri} value={s.uri}>
+                                  {s.uri +
+                                    " - " +
+                                    Utils.chainDisplayName(s.chain_name) +
+                                    (s.latency ? " _ " + s.latency + " ms." : "")}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
                     <div style={{ margin: "5px 10px" }}>
                       {isSwarmChain(selectedChain) ? (
                         // One radio on its own would be a control with nothing
@@ -1338,9 +1349,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                         <>
                           Server address
                           {swarmPresetFor(customServer) && (
-                            <span className={cstyles.sublight}>
-                              &nbsp;— {swarmPresetFor(customServer)?.note}
-                            </span>
+                            <span className={cstyles.sublight}>&nbsp;— {swarmPresetFor(customServer)?.note}</span>
                           )}
                         </>
                       ) : (

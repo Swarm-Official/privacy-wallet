@@ -291,6 +291,21 @@ export const SCENARIOS: MockScenario[] = [
   },
 ];
 
+/** No wallets at all: what a person sees the very first time. */
+SCENARIOS.push({
+  id: "firstrun",
+  label: "First run · no wallet",
+  state: baseState({
+    totalBalance: new TotalBalanceClass(),
+    valueTransfers: [],
+    messages: [],
+    wallets: [],
+    currentWallet: null,
+    addressesUnified: [],
+    addressesTransparent: [],
+  }),
+});
+
 export function scenarioById(id: string): MockScenario {
   return SCENARIOS.find((s) => s.id === id) ?? SCENARIOS[0];
 }

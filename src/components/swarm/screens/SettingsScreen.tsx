@@ -1,110 +1,260 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "../Swarm.module.css";
-import { SwarmIcon } from "../SwarmIcons";
-import { serverHost } from "../swarmStatus";
+import { SwarmIcon, SwarmIconName } from "../SwarmIcons";
+import SwarmActionsContext from "../SwarmActionsContext";
+import { deriveStatus, serverHost } from "../swarmStatus";
 import { ContextApp } from "../../../context/ContextAppState";
+import MixnetModal from "../../sideBar/components/MixnetModal";
+import AppSecurityModal from "../../appSecurity/AppSecurityModal";
 import routes from "../../../constants/routes.json";
 import APP_VERSION, { UPSTREAM_VERSION } from "../../../version";
 import { SWARM_NETWORK_LABEL, SWARM_TICKER } from "../../../utils/swarmNetwork";
+import { ADD_NEW, RESTORE, chooseWallet } from "../../walletBar/walletSwitching";
 
 /**
- * Settings, gathered from the places the old app kept them — a native menu,
- * a sidebar button, and three modals.
+ * Settings: what is true of this wallet, and the handful of things you can
+ * change about it.
  *
- * This is the first pass: it states what is true of the running wallet and
- * routes to the existing screens that change it. The editable rows arrive with
- * the rest of Settings.
+ * Most of these used to be reachable only from the native menu — device
+ * authentication, importing another installation's data, rescanning — which is
+ * where a user looks last and a new user never looks. They are offered here as
+ * well, calling the same handlers.
+ *
+ * Read-only rows stay read-only on purpose. The chain a wallet is on is fixed
+ * when the wallet is created, and a control that appeared to change it would
+ * be offering to move someone's money to a network it does not exist on.
  */
+
+type Row =
+  | { kind: "value"; k: string; d: string; v: string; tone?: "good" | "warn" }
+  | { kind: "action"; k: string; d: string; action: string; onClick: () => void; disabled?: boolean };
+
+type Group = { title: string; icon: SwarmIconName; rows: Row[] };
+
 export const SettingsScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { info, currentWallet, readOnly, birthday } = useContext(ContextApp);
+  const { openImport, rescan } = useContext(SwarmActionsContext);
+  const {
+    info,
+    currentWallet,
+    readOnly,
+    birthday,
+    verificationProgress,
+    syncingStatus,
+    wallets,
+    openErrorModal,
+    reopenWallet,
+  } = useContext(ContextApp);
 
-  const rows: { title: string; rows: { k: string; d: string; v: string }[]; icon: "globe" | "lock" | "key" }[] = [
+  const [mixnetOpen, setMixnetOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
+
+  const status = deriveStatus(info, verificationProgress, syncingStatus);
+
+  const go = (value: string) =>
+    chooseWallet(value, {
+      currentWalletId: currentWallet?.id,
+      navigate,
+      openErrorModal,
+      reopenWallet,
+    });
+
+  const groups: Group[] = [
     {
       title: "Network",
       icon: "globe",
       rows: [
-        { k: "Network", d: "The chain this wallet is on", v: SWARM_NETWORK_LABEL },
-        { k: "Server", d: "The indexer this wallet talks to", v: serverHost(info.serverUri) || "not set" },
-        { k: "Block height", d: "Last height the server reported", v: info.latestBlock ? `#${info.latestBlock}` : "—" },
-        { k: "Coin", d: "What balances are counted in", v: SWARM_TICKER },
+        {
+          kind: "value",
+          k: "Network",
+          d: "The chain this wallet lives on — fixed when it was created",
+          v: SWARM_NETWORK_LABEL,
+        },
+        {
+          kind: "value",
+          k: "Server",
+          d: "The indexer this wallet talks to",
+          v: serverHost(info.serverUri) || "not set",
+        },
+        {
+          kind: "value",
+          k: "Connection",
+          d: "What the server last told us",
+          v: status.state === "synced" ? `Synced · #${info.latestBlock}` : status.label,
+          tone: status.state === "synced" ? "good" : "warn",
+        },
+        { kind: "value", k: "Coin", d: "What balances are counted in", v: SWARM_TICKER },
+        {
+          kind: "action",
+          k: "Nym mixnet",
+          d: "Hide your IP from the indexer. Not available on this network",
+          action: "Open…",
+          onClick: () => setMixnetOpen(true),
+        },
       ],
     },
     {
-      title: "Wallet",
+      title: "This wallet",
       icon: "key",
       rows: [
-        { k: "Name", d: "A local label only", v: currentWallet?.alias ?? "—" },
-        { k: "Created", d: "How this wallet was made", v: currentWallet?.creationType ?? "—" },
-        { k: "Birthday", d: "The height it starts scanning from", v: birthday ? `#${birthday}` : "—" },
-        { k: "Mode", d: "Whether it can spend", v: readOnly ? "Watch-only" : "Can send" },
+        { kind: "value", k: "Name", d: "A local label only — never sent anywhere", v: currentWallet?.alias ?? "—" },
+        { kind: "value", k: "Created", d: "How this wallet was made", v: currentWallet?.creationType ?? "—" },
+        { kind: "value", k: "Birthday", d: "The height it starts scanning from", v: birthday ? `#${birthday}` : "—" },
+        {
+          kind: "value",
+          k: "Mode",
+          d: "Whether it holds a spending key",
+          v: readOnly ? "Watch-only" : "Can send",
+          tone: readOnly ? "warn" : "good",
+        },
+        {
+          kind: "action",
+          k: "Rescan",
+          d: "Read the chain again from the birthday. Slow, and never necessary twice",
+          action: "Rescan…",
+          onClick: rescan,
+        },
       ],
     },
     {
-      title: "About",
+      title: "Security",
       icon: "lock",
       rows: [
-        { k: "SWARM Wallet", d: "This application", v: APP_VERSION },
-        { k: "Built on", d: "Upstream release this fork tracks", v: UPSTREAM_VERSION },
+        {
+          kind: "action",
+          k: "Unlock with Windows Hello",
+          d: "Ask for the device's own authentication before opening the wallet",
+          action: "Settings…",
+          // This modal is self-contained — it reads and writes its own setting
+          // over IPC — so it is mounted here rather than routed through the
+          // one the native menu opens.
+          onClick: () => setSecurityOpen(true),
+        },
+        {
+          kind: "value",
+          k: "Recovery phrase",
+          d: "In the menu under Wallet → Seed Phrase. Never shown unprompted, never logged",
+          v: "Wallet menu",
+        },
+      ],
+    },
+    {
+      title: "Wallets & data",
+      icon: "addresses",
+      rows: [
+        {
+          kind: "value",
+          k: "Wallets on this computer",
+          d: "Switch between them from the rail",
+          v: String(wallets?.length ?? 0),
+        },
+        {
+          kind: "action",
+          k: "Add a new wallet",
+          d: "Create a fresh one, with a new recovery phrase",
+          action: "Add…",
+          onClick: () => void go(ADD_NEW),
+        },
+        {
+          kind: "action",
+          k: "Restore a wallet",
+          d: "From a recovery phrase, a viewing key or a wallet file",
+          action: "Restore…",
+          onClick: () => void go(RESTORE),
+        },
+        {
+          kind: "action",
+          k: "Import from another installation",
+          d: "Copy wallets and settings out of a previous install",
+          action: "Import…",
+          onClick: openImport,
+        },
       ],
     },
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignContent: "start" }}>
-      {rows.map((group) => (
-        <section key={group.title} className={styles.panel}>
-          <div className={styles.panelHead}>
-            <span style={{ color: "var(--swarm-orange)", display: "flex" }}>
-              <SwarmIcon name={group.icon} />
-            </span>
-            <div className={styles.panelTitle} style={{ flex: 1 }}>
-              {group.title}
+    <>
+      <div className={styles.settingsGrid}>
+        {groups.map((group) => (
+          <section key={group.title} className={styles.panel}>
+            <div className={styles.panelHead}>
+              <span style={{ color: "var(--swarm-orange)", display: "flex" }}>
+                <SwarmIcon name={group.icon} />
+              </span>
+              <div className={styles.panelTitle} style={{ flex: 1 }}>
+                {group.title}
+              </div>
+            </div>
+            <div className={styles.panelBody}>
+              {group.rows.map((r) => (
+                <div key={r.k} className={styles.rowItem} style={{ cursor: "default" }}>
+                  <span className={styles.rowMain}>
+                    <span className={styles.rowTitle}>{r.k}</span>
+                    <span className={styles.statNote}>{r.d}</span>
+                  </span>
+                  {r.kind === "value" ? (
+                    <span
+                      className={`${styles.mono} ${styles.settingValue}`}
+                      style={
+                        r.tone === "good"
+                          ? { color: "var(--swarm-green)" }
+                          : r.tone === "warn"
+                            ? { color: "var(--swarm-honey)" }
+                            : undefined
+                      }
+                    >
+                      {r.v}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnSmall}`}
+                      onClick={r.onClick}
+                      disabled={r.disabled}
+                    >
+                      {r.action}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+
+        <section className={`${styles.panel} ${styles.panelPad}`} aria-label="About">
+          <div className={styles.panelTitle}>About</div>
+          <div className={styles.factList}>
+            <div className={styles.factRow}>
+              <span>SWARM Wallet</span>
+              <span className={styles.factVisible}>{APP_VERSION}</span>
+            </div>
+            <div className={styles.factRow}>
+              <span>Network</span>
+              <span className={styles.factVisible}>{SWARM_NETWORK_LABEL}</span>
             </div>
           </div>
-          <div className={styles.panelBody}>
-            {group.rows.map((r) => (
-              <div key={r.k} className={styles.rowItem} style={{ cursor: "default" }}>
-                <span className={styles.rowMain}>
-                  <span className={styles.rowTitle}>{r.k}</span>
-                  <span className={styles.statNote}>{r.d}</span>
-                </span>
-                <span className={`${styles.mono} ${styles.muted}`} style={{ fontSize: 12 }}>
-                  {r.v}
-                </span>
-              </div>
-            ))}
+          {/*
+            The attribution the licence requires, and the only place upstream's
+            name appears in this application. It is not a defect and the bundle
+            check allows this sentence by name: the MIT licence requires the
+            copyright notice to travel with the code, and saying what this is
+            built on is the honest thing to do besides.
+          */}
+          <div className={styles.licence}>
+            Based on Zingo PC {UPSTREAM_VERSION} by ZingoLabs (MIT). SWARM Wallet is an independent fork and is not
+            endorsed by ZingoLabs.
           </div>
+          <button type="button" className={styles.panelLink} onClick={() => navigate(routes.DASHBOARD)}>
+            Back to Overview →
+          </button>
         </section>
-      ))}
+      </div>
 
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
-          <div className={styles.panelTitle}>Wallets</div>
-        </div>
-        <div className={styles.panelPad}>
-          <div className={styles.statNote}>
-            Add another wallet, or restore one from its recovery phrase. Switching between wallets is in the menu at the
-            top of the rail.
-          </div>
-          <button
-            type="button"
-            className={styles.btn}
-            onClick={() => navigate(routes.ADDNEWWALLET, { state: { mode: "addnew", newWalletType: "new" } })}
-          >
-            Add a new wallet…
-          </button>
-          <button
-            type="button"
-            className={styles.btn}
-            onClick={() => navigate(routes.ADDNEWWALLET, { state: { mode: "addnew", newWalletType: "seed" } })}
-          >
-            Restore a wallet…
-          </button>
-        </div>
-      </section>
-    </div>
+      <MixnetModal modalIsOpen={mixnetOpen} closeModal={() => setMixnetOpen(false)} />
+      <AppSecurityModal isOpen={securityOpen} onClose={() => setSecurityOpen(false)} />
+    </>
   );
 };
 

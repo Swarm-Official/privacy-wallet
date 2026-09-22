@@ -1,4 +1,15 @@
 /*
+ * Accessibility, decided once here rather than per component.
+ *
+ * The three faintest text tokens in the palette do not clear WCAG AA against
+ * these surfaces — #7d746a reaches 4.2:1, #6b645a 3.3:1 and #544e45 2.3:1,
+ * where small text needs 4.5:1. They are lovely and they were unreadable, so
+ * every secondary line in these screens uses --swarm-text-muted (7.4:1) and
+ * the hierarchy is carried by size and weight instead of by contrast. The
+ * tokens themselves are untouched: they are the style guide's.
+ */
+
+/*
  * The SWARM wallet's own surface.
  *
  * Every colour, radius and family here is a token from Global.css — the style
@@ -84,7 +95,7 @@
   width: 18px;
   height: 18px;
   flex: none;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
 }
 
 .navItemActive {
@@ -136,7 +147,7 @@
 .statusDetail {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
   margin-top: 6px;
   word-break: break-all;
 }
@@ -171,7 +182,7 @@
   font-size: 9.5px;
   line-height: 1.7;
   letter-spacing: 0.06em;
-  color: var(--swarm-text-disabled);
+  color: var(--swarm-text-muted);
   padding: 0 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -203,7 +214,7 @@
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.2em;
-  color: var(--swarm-text-dim);
+  color: var(--swarm-text-muted);
 }
 
 .screenTitle {
@@ -326,7 +337,7 @@
 .detailsSummary::before {
   content: "▸";
   font-size: 10px;
-  color: var(--swarm-text-dim);
+  color: var(--swarm-text-muted);
 }
 
 details[open] > .detailsSummary::before {
@@ -342,7 +353,7 @@ details[open] > .detailsSummary::before {
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.6;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 180px;
@@ -391,7 +402,7 @@ details[open] > .detailsSummary::before {
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.2em;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
 }
 
 .badge {
@@ -536,7 +547,7 @@ details[open] > .detailsSummary::before {
 
 .statNote {
   font-size: 11.5px;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
   margin-top: 4px;
 }
 
@@ -575,7 +586,7 @@ details[open] > .detailsSummary::before {
 }
 
 .popoverRow span:first-child {
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
 }
 
 /* ----------------------------------------------------------- panel/list --- */
@@ -698,7 +709,7 @@ details[open] > .detailsSummary::before {
   display: block;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
   margin-top: 3px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -757,7 +768,7 @@ details[open] > .detailsSummary::before {
 .empty {
   padding: 34px 20px;
   text-align: center;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -778,7 +789,7 @@ details[open] > .detailsSummary::before {
 }
 
 .labelHint {
-  color: var(--swarm-text-dim);
+  color: var(--swarm-text-muted);
   font-weight: 400;
 }
 
@@ -795,7 +806,7 @@ details[open] > .detailsSummary::before {
 }
 
 .input::placeholder {
-  color: var(--swarm-text-dim);
+  color: var(--swarm-text-muted);
 }
 
 .input:focus {
@@ -845,7 +856,7 @@ details[open] > .detailsSummary::before {
 .fieldNote {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
   margin-top: 7px;
 }
 
@@ -893,7 +904,7 @@ details[open] > .detailsSummary::before {
 .sendModeFee {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
 }
 
 /* ------------------------------------------------------------ utilities --- */
@@ -910,7 +921,7 @@ details[open] > .detailsSummary::before {
 }
 
 .muted {
-  color: var(--swarm-text-faint);
+  color: var(--swarm-text-muted);
 }
 
 .srOnly {
@@ -930,7 +941,9 @@ details[open] > .detailsSummary::before {
  * which made the app unusable from the keyboard; `:focus-visible` keeps it off
  * the mouse path.
  */
-.shell :focus-visible {
+.shell :focus-visible,
+.onboardFrame :focus-visible,
+.onboardWrap :focus-visible {
   outline: 2px solid var(--swarm-honey);
   outline-offset: 2px;
   border-radius: 4px;
@@ -958,7 +971,9 @@ details[open] > .detailsSummary::before {
 @media (prefers-reduced-motion: reduce) {
   .shell *,
   .shell *::before,
-  .shell *::after {
+  .shell *::after,
+  .onboardFrame *,
+  .onboardWrap * {
     animation: none !important;
     transition: none !important;
   }
@@ -1230,7 +1245,7 @@ details[open] > .detailsSummary::before {
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--swarm-text-dim);
+  color: var(--swarm-text-muted);
   display: flex;
   pointer-events: none;
 }
@@ -1258,4 +1273,226 @@ details[open] > .detailsSummary::before {
 
 .stateMined {
   color: var(--swarm-honey);
+}
+
+/* ------------------------------------------------------ addresses/settings --- */
+
+.sectionHeading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
+  color: var(--swarm-text);
+}
+
+.contactMark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--swarm-surface-raised);
+  border: 1px solid var(--swarm-hairline-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--swarm-text-soft);
+}
+
+.contactActions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.addContact {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.addContactActions {
+  display: flex;
+  gap: 8px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-content: start;
+}
+
+.settingValue {
+  font-size: 12px;
+  color: var(--swarm-text-muted);
+  text-align: right;
+  flex: none;
+  max-width: 45%;
+  overflow-wrap: anywhere;
+}
+
+.licence {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--swarm-text-muted);
+  padding-top: 12px;
+  border-top: 1px solid var(--swarm-hairline);
+}
+
+/* ------------------------------------------------------------ onboarding --- */
+
+.onboardWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0 40px;
+}
+
+.onboardCard {
+  width: 100%;
+  max-width: 560px;
+  padding: 32px;
+  border-radius: 20px;
+  border: 1px solid var(--swarm-orange-edge);
+  background: linear-gradient(160deg, rgba(255, 138, 31, 0.12), #15110d 60%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.onboardBee {
+  align-self: center;
+  margin-bottom: 6px;
+}
+
+.onboardTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 4px 0 0;
+}
+
+.onboardBody {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--swarm-text-muted);
+  margin: 0;
+}
+
+.onboardWarn {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: var(--radius-l);
+  border: 1px solid rgba(255, 176, 32, 0.4);
+  background: rgba(255, 176, 32, 0.07);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--swarm-text-soft);
+  margin-top: 6px;
+}
+
+.onboardWarn strong {
+  color: var(--swarm-text);
+  font-weight: 600;
+}
+
+.onboardWarn .problemIcon {
+  color: var(--swarm-honey);
+}
+
+.onboardActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.onboardFrame {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 22px 26px 26px;
+  background: var(--swarm-surface);
+  color: var(--swarm-text);
+  font-family: var(--font-text);
+}
+
+.onboardHead {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.onboardHead .brand {
+  padding: 0;
+}
+
+.stepRail {
+  display: flex;
+  gap: 16px;
+  list-style: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--swarm-text-muted);
+}
+
+.stepActive {
+  color: var(--swarm-honey);
+}
+
+.stepDot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.onboardNote {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid rgba(255, 176, 32, 0.35);
+  background: rgba(255, 176, 32, 0.06);
+  font-size: 12.5px;
+  color: var(--swarm-text-soft);
+}
+
+.onboardNote svg {
+  flex: none;
+  color: var(--swarm-honey);
+}
+
+.onboardForm {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }

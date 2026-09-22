@@ -31,7 +31,7 @@ import { ZcashURITarget } from "../utils/uris";
 import pickRotationTarget from "../utils/pickRotationTarget";
 import selectFastestServer from "../utils/selectFastestServer";
 import { AddNewWallet } from "../components/addNewWallet";
-import { AddressBook, AddressbookImpl } from "../components/addressBook";
+import { AddressbookImpl } from "../components/addressBook";
 import { Sidebar } from "../components/sideBar";
 import { Swap } from "../components/swap";
 import type { SwapDirectionEnum } from "../swap/enums/SwapDirectionEnum";
@@ -57,6 +57,9 @@ import { SettingsScreen } from "../components/swarm/screens/SettingsScreen";
 import { SendScreen } from "../components/swarm/screens/SendScreen";
 import { ReceiveScreen } from "../components/swarm/screens/ReceiveScreen";
 import { ActivityScreen } from "../components/swarm/screens/ActivityScreen";
+import { AddressesScreen } from "../components/swarm/screens/AddressesScreen";
+import { OnboardingScreen } from "../components/swarm/screens/OnboardingScreen";
+import { SwarmActionsContext } from "../components/swarm/SwarmActionsContext";
 
 const { ipcRenderer } = window.electronAPI;
 
@@ -768,6 +771,23 @@ const AppRoutes: React.FC = () => {
     ],
   );
 
+  // The same handlers the native menu fires, offered to Settings as well.
+  const swarmActions = useMemo(
+    () => ({
+      openSecurity: () => setSecurityModalOpen(true),
+      openImport: async () => {
+        const result = await ipcRenderer.invoke("import:scan");
+        if (result?.ok) {
+          setImportScanResult(result as ImportScanResult);
+          setImportModalOpen(true);
+        }
+      },
+      rescan: runRPCRescan,
+      retrySync: runRPCRetrySync,
+    }),
+    [runRPCRescan, runRPCRetrySync],
+  );
+
   if (!lockChecked) return null;
 
   if (locked) {
@@ -803,8 +823,9 @@ const AppRoutes: React.FC = () => {
         chainName={currentWallet?.chain_name ?? ServerChainNameEnum.mainChainName}
         enabled={!!currentWallet && !currentWalletOpenError && location.pathname !== routes.LOADING}
       >
-        <SwarmUiProvider>
-          {/*
+        <SwarmActionsContext.Provider value={swarmActions}>
+          <SwarmUiProvider>
+            {/*
             The old sidebar, kept mounted and out of sight.
 
             Nothing in it is drawn any more — the rail replaced it — but it is
@@ -815,81 +836,87 @@ const AppRoutes: React.FC = () => {
             item in the application; moving the handlers out is a change to
             logic this one is not making.
           */}
-          <div style={{ display: "none" }} aria-hidden="true">
-            <Sidebar doRescan={runRPCRescan} />
-          </div>
-
-          {location.pathname === routes.LOADING || location.pathname === routes.ADDNEWWALLET ? (
-            // Opening a wallet and adding one are the two screens that exist
-            // before there is a wallet to frame. They take the whole window.
-            <div className={cstyles.contentcontainer} style={{ left: 0, width: "100vw" }}>
-              <Routes>
-                <Route
-                  path={routes.ADDNEWWALLET}
-                  element={
-                    <AddNewWallet
-                      closeModal={navigateToDashboard}
-                      setWallets={setWallets}
-                      setCurrentWallet={setCurrentWallet}
-                      navigateToLoadingScreenChangingWallet={navigateToLoadingScreenChangingWallet}
-                      doSaveWallet={() => RPC.doSave()}
-                      clearTimers={() => rpcRef.current?.clearTimers() ?? Promise.resolve()}
-                    />
-                  }
-                />
-                <Route
-                  path={routes.LOADING}
-                  element={
-                    <LoadingScreen
-                      runRPCConfigure={() => rpcRef.current?.configure()}
-                      setInfo={setInfo}
-                      setReadOnly={setReadOnly}
-                      navigateToDashboard={navigateToDashboard}
-                      setBirthday={setBirthday}
-                      setPools={setPools}
-                      setWallets={setWallets}
-                      setCurrentWallet={setCurrentWallet}
-                      setCurrentWalletOpenError={setCurrentWalletOpenError}
-                      setFetchError={setFetchError}
-                    />
-                  }
-                />
-              </Routes>
+            <div style={{ display: "none" }} aria-hidden="true">
+              <Sidebar doRescan={runRPCRescan} />
             </div>
-          ) : (
-            <SwarmShell onRetry={runRPCRetrySync}>
-              <Routes>
-                <Route path={routes.DASHBOARD} element={<OverviewScreen />} />
-                <Route path={routes.SETTINGS} element={<SettingsScreen />} />
-                <Route
-                  path={routes.SEND}
-                  element={<SendScreen sendTransaction={runRPCSendTransaction} setSendPageState={setSendPageState} />}
-                />
-                <Route path={routes.RECEIVE} element={<ReceiveScreen />} />
-                <Route
-                  path={routes.ADDRESSBOOK}
-                  element={
-                    <AddressBook
-                      addAddressBookEntry={addAddressBookEntry}
-                      removeAddressBookEntry={removeAddressBookEntry}
-                    />
-                  }
-                />
-                <Route path={routes.INSIGHT} element={<Insight />} />
-                <Route path={routes.HISTORY} element={<ActivityScreen />} />
-                <Route
-                  path={routes.SWAP}
-                  element={<Swap sendSwapDeposit={runRPCSendSwapDeposit} addAddressBookEntry={addAddressBookEntry} />}
-                />
-                {/* Memos are a filter inside Activity now, not a screen of their own:
+
+            {location.pathname === routes.LOADING || location.pathname === routes.ADDNEWWALLET ? (
+              // Opening a wallet and adding one are the two screens that exist
+              // before there is a wallet to frame. They take the whole window.
+              <div className={cstyles.contentcontainer} style={{ left: 0, width: "100vw" }}>
+                <Routes>
+                  <Route
+                    path={routes.ADDNEWWALLET}
+                    element={
+                      <OnboardingScreen>
+                        <AddNewWallet
+                          closeModal={navigateToDashboard}
+                          setWallets={setWallets}
+                          setCurrentWallet={setCurrentWallet}
+                          navigateToLoadingScreenChangingWallet={navigateToLoadingScreenChangingWallet}
+                          doSaveWallet={() => RPC.doSave()}
+                          clearTimers={() => rpcRef.current?.clearTimers() ?? Promise.resolve()}
+                        />
+                      </OnboardingScreen>
+                    }
+                  />
+                  <Route
+                    path={routes.LOADING}
+                    element={
+                      <LoadingScreen
+                        runRPCConfigure={() => rpcRef.current?.configure()}
+                        setInfo={setInfo}
+                        setReadOnly={setReadOnly}
+                        navigateToDashboard={navigateToDashboard}
+                        setBirthday={setBirthday}
+                        setPools={setPools}
+                        setWallets={setWallets}
+                        setCurrentWallet={setCurrentWallet}
+                        setCurrentWalletOpenError={setCurrentWalletOpenError}
+                        setFetchError={setFetchError}
+                      />
+                    }
+                  />
+                </Routes>
+              </div>
+            ) : (
+              <SwarmShell onRetry={runRPCRetrySync}>
+                <Routes>
+                  <Route path={routes.DASHBOARD} element={<OverviewScreen />} />
+                  <Route path={routes.SETTINGS} element={<SettingsScreen />} />
+                  <Route
+                    path={routes.SEND}
+                    element={<SendScreen sendTransaction={runRPCSendTransaction} setSendPageState={setSendPageState} />}
+                  />
+                  <Route path={routes.RECEIVE} element={<ReceiveScreen />} />
+                  <Route
+                    path={routes.ADDRESSBOOK}
+                    element={
+                      <AddressesScreen
+                        addAddressBookEntry={addAddressBookEntry}
+                        removeAddressBookEntry={removeAddressBookEntry}
+                      />
+                    }
+                  />
+                  <Route path={routes.INSIGHT} element={<Insight />} />
+                  <Route path={routes.HISTORY} element={<ActivityScreen />} />
+                  <Route
+                    path={routes.SWAP}
+                    element={<Swap sendSwapDeposit={runRPCSendSwapDeposit} addAddressBookEntry={addAddressBookEntry} />}
+                  />
+                  {/* Memos are a filter inside Activity now, not a screen of their own:
                     a memo is a property of a payment. The route stays so a menu item
                     or a saved link still lands somewhere sensible. */}
-                <Route path={routes.MESSAGES} element={<ActivityScreen />} />
-                <Route path={routes.MIGRATION} element={<OrchardMigration drainToIronwood={runRPCDrainToIronwood} />} />
-              </Routes>
-            </SwarmShell>
-          )}
-        </SwarmUiProvider>
+                  <Route path={routes.MESSAGES} element={<ActivityScreen />} />
+                  <Route
+                    path={routes.MIGRATION}
+                    element={<OrchardMigration drainToIronwood={runRPCDrainToIronwood} />}
+                  />
+                </Routes>
+              </SwarmShell>
+            )}
+          </SwarmUiProvider>
+        </SwarmActionsContext.Provider>
       </SwapServiceProvider>
     </ContextAppProvider>
   );
