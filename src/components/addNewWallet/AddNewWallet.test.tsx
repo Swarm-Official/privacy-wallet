@@ -289,6 +289,30 @@ describe("AddNewWallet on the project chain", () => {
     expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
   });
 
+  // Adding a second wallet while one is already open: the screen must inherit
+  // the open wallet's chain and server, not fall back to public testnet.
+  it("adds a second wallet on the same chain and server as the one already open", async () => {
+    storedSettings({ serveruri: OWN_NODE, serverselection: "custom" });
+    render(<AddNewWallet {...baseProps} />, {
+      initialRoute: "/addnewwallet",
+      contextOverrides: {
+        currentWallet: {
+          id: 4,
+          alias: "Mining",
+          fileName: "w.dat",
+          chain_name: SWARM,
+          uri: OWN_NODE,
+          selection: "custom",
+        } as never,
+      },
+    });
+    await openServerBlock();
+
+    expect(screen.getByRole("combobox", { name: /network/i })).toHaveValue(SWARM);
+    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(OWN_NODE);
+    expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
+  });
+
   it("offers both project servers and still takes a typed one", async () => {
     storedSettings();
     await mount();

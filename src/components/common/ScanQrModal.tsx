@@ -234,7 +234,10 @@ const ScanQrModal: React.FC<ScanQrModalProps> = ({ modalIsOpen, closeModal, onSc
               marginTop: 12,
               padding: 24,
               borderRadius: 8,
-              border: `1px dashed var(--color-${draggingOver ? "zingo" : "primary"})`,
+              // Whole token names, not a spliced suffix: the bundle check
+              // reads the built chunks, and a name assembled at runtime is a
+              // name it cannot account for.
+              border: `1px dashed var(${draggingOver ? "--color-zingo" : "--color-primary"})`,
             }}
           >
             <FontAwesomeIcon icon={faQrcode} size="2x" />

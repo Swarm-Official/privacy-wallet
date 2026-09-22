@@ -37,7 +37,16 @@ if (!asarPath && !rendererDir) {
   throw new Error("give --asar <app.asar> and/or --renderer <build/static/js>");
 }
 
-// Sentences the licence and honest attribution require.
+// Sentences the licence and honest attribution require, plus the internal
+// identifiers that carry the name without ever showing it.
+//
+// The identifiers are the reason this list is not simply "anything with the
+// word in it". `webpackJsonpzingo-pc` is webpack's chunk-loading global, taken
+// from the build-time package name, and `zingolib` is the SDK's actual name as
+// a property on the info object. Renaming either would be renaming a package
+// or a field, which is not what this check is for — and neither reaches a
+// screen. Both are listed exactly, so a sentence containing them is still
+// caught.
 const ALLOWED = [
   "Based on Zingo PC ",
   "by ZingoLabs, under the MIT licence below.",
@@ -45,6 +54,18 @@ const ALLOWED = [
   "The MIT License (MIT) Copyright (c) 2026 ZingoLabs",
   // The wallet reports which SDK it runs; the SDK is called Zingolib.
   "Wallet SDK (Zingolib)",
+  "webpackJsonpzingo-pc",
+  "zingolib",
+  // A CSS custom property. Its value is a SWARM colour; only the token is
+  // inherited. Renaming it would touch every stylesheet for no gain a user
+  // could see, and would collide with the UI rebuild happening in parallel.
+  "--color-zingo",
+  // The wallet file on disk. `zingo-wallet.dat`, `zingo-wallet-4.dat` and so
+  // on are what the SDK already wrote into keys/swarm-testnet, and the owner
+  // has coins in one of them. Renaming this would orphan a real wallet, so it
+  // stays — including in the placeholder on the restore-from-file screen,
+  // which is telling the user the truth about what their file is called.
+  "zingo-wallet",
 ];
 
 // What must never reach a user's screen, wherever it is packaged.
@@ -61,13 +82,22 @@ const FORBIDDEN = [
   "Zingo PC could not start",
 ];
 
-/** Every index at which `needle` occurs in `haystack`. */
+/**
+ * Every index at which `needle` occurs in `haystack`, ignoring case.
+ *
+ * Case-insensitive because the first version of this check was not, and
+ * "github.com/zingolabs/zingo-pc/issues" — a sentence the loading screen put
+ * in front of the user — walked straight past a sweep looking for "Zingo".
+ * The name is the name whatever case it is written in.
+ */
 const occurrences = (haystack, needle) => {
   const found = [];
-  let at = haystack.indexOf(needle);
+  const hay = haystack.toLowerCase();
+  const pin = needle.toLowerCase();
+  let at = hay.indexOf(pin);
   while (at !== -1) {
     found.push(at);
-    at = haystack.indexOf(needle, at + needle.length);
+    at = hay.indexOf(pin, at + pin.length);
   }
   return found;
 };

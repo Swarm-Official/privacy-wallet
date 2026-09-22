@@ -1,72 +1,60 @@
 import React, { useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import cstyles from "../common/Common.module.css";
 import { ContextApp } from "../../context/ContextAppState";
-import { ServerChainNameEnum, WalletType } from "../appstate";
-import { ipcRenderer } from "../../electronBridge";
+import { WalletType } from "../appstate";
+import { ADD_NEW, RESTORE, chooseWallet, groupWallets } from "./walletSwitching";
 
 type SelectWalletProps = {
   navigateToLoadingScreenChangingWallet: () => void;
 };
 
+/**
+ * The wallet bar's switcher.
+ *
+ * The listing rule and the switch itself live in `walletSwitching`, shared
+ * with the SWARM rail's menu, so the two controls cannot disagree about which
+ * wallets exist — which is how this one came to render zero options on a chain
+ * it had not been told about.
+ */
 const SelectWallet = ({ navigateToLoadingScreenChangingWallet }: SelectWalletProps) => {
   const context = useContext(ContextApp);
   const { currentWallet, wallets, openErrorModal } = context;
+  const navigate = useNavigate();
 
-  const walletsSorted = wallets.sort((a, b) => {
-    const chainCmp = a.chain_name.localeCompare(b.chain_name);
-    return chainCmp !== 0 ? chainCmp : a.id - b.id;
-  });
+  if (currentWallet === null) return null;
+
+  const groups = groupWallets(wallets);
+
+  const onChange = (value: string) =>
+    chooseWallet(value, {
+      currentWalletId: currentWallet.id,
+      navigate,
+      openErrorModal,
+      reopenWallet: navigateToLoadingScreenChangingWallet,
+    });
 
   return (
-    <>
-      {currentWallet !== null && (
-        <select
-          className={cstyles.fieldselect}
-          value={currentWallet.id}
-          onChange={async (e) => {
-            openErrorModal("Change Wallet", "Opening the new active Wallet selected");
-            const id: number = Number(e.target.value);
-            await ipcRenderer.invoke("saveSettings", { key: "currentwalletid", value: id });
-            navigateToLoadingScreenChangingWallet();
-          }}
-        >
-          {walletsSorted.filter((w: WalletType) => w.chain_name === ServerChainNameEnum.mainChainName).length > 0 && (
-            <optgroup label="MAINNET">
-              {walletsSorted
-                .filter((w: WalletType) => w.chain_name === ServerChainNameEnum.mainChainName)
-                .map((w: WalletType) => (
-                  <option key={w.id} value={w.id}>
-                    {w.alias + " - [" + w.creationType + "]" + (w.id === currentWallet.id ? " \u2714" : "")}
-                  </option>
-                ))}
-            </optgroup>
-          )}
-          {walletsSorted.filter((w: WalletType) => w.chain_name === ServerChainNameEnum.testChainName).length > 0 && (
-            <optgroup label="TESTNET">
-              {walletsSorted
-                .filter((w: WalletType) => w.chain_name === ServerChainNameEnum.testChainName)
-                .map((w: WalletType) => (
-                  <option key={w.id} value={w.id}>
-                    {w.alias + " - [" + w.creationType + "]" + (w.id === currentWallet.id ? " \u2714" : "")}
-                  </option>
-                ))}
-            </optgroup>
-          )}
-          {walletsSorted.filter((w: WalletType) => w.chain_name === ServerChainNameEnum.regtestChainName).length >
-            0 && (
-            <optgroup label="REGTEST">
-              {walletsSorted
-                .filter((w: WalletType) => w.chain_name === ServerChainNameEnum.regtestChainName)
-                .map((w: WalletType) => (
-                  <option key={w.id} value={w.id}>
-                    {w.alias + " - [" + w.creationType + "]" + (w.id === currentWallet.id ? " \u2714" : "")}
-                  </option>
-                ))}
-            </optgroup>
-          )}
-        </select>
-      )}
-    </>
+    <select
+      className={cstyles.fieldselect}
+      aria-label="Wallet"
+      value={currentWallet.id}
+      onChange={(e) => void onChange(e.target.value)}
+    >
+      {groups.map((group) => (
+        <optgroup key={group.chain} label={group.label}>
+          {group.wallets.map((w: WalletType) => (
+            <option key={w.id} value={w.id}>
+              {w.alias + " - [" + w.creationType + "]" + (w.id === currentWallet.id ? " ✔" : "")}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+      <optgroup label="MORE">
+        <option value={ADD_NEW}>Add a new wallet…</option>
+        <option value={RESTORE}>Restore a wallet…</option>
+      </optgroup>
+    </select>
   );
 };
 

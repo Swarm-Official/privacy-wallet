@@ -3,10 +3,7 @@ import { useNavigate } from "react-router-dom";
 import styles from "./Swarm.module.css";
 import menuStyles from "./SwarmWalletMenu.module.css";
 import { ContextApp } from "../../context/ContextAppState";
-import { WalletType } from "../appstate";
-import routes from "../../constants/routes.json";
-import { ipcRenderer } from "../../electronBridge";
-import Utils from "../../utils/utils";
+import { ADD_NEW, RESTORE, chooseWallet, groupWallets } from "../walletBar/walletSwitching";
 
 /**
  * Which wallet is open, and the way to open a different one.
@@ -18,23 +15,17 @@ import Utils from "../../utils/utils";
  * W-4, and the owner reported it as "this button is not working. As well there
  * is no way to switch in between those wallets."
  *
- * So this one groups by whatever chains the wallets are actually on, rather
- * than by a list of chains written down in advance, and it is useful with a
- * single wallet: one wallet plus the two things you might want to do next.
- *
- * Switching itself is the same two steps as before — record the choice, then
- * reopen — because reopening a wallet is the loading screen's job and not
- * something a menu should be doing differently.
+ * The listing rule and the switch are not this file's: they live in
+ * `walletBar/walletSwitching`, shared with the `<select>` in the wallet bar,
+ * so the two controls cannot disagree about which wallets exist. What is this
+ * file's is the presentation — a menu that is useful with one wallet, showing
+ * that wallet plus the two things you might want to do next.
  */
 
 type SwarmWalletMenuProps = {
   /** Reopens the app against whichever wallet id was just recorded. */
   reopenWallet: () => void;
 };
-
-function chainLabel(chain: string | undefined): string {
-  return Utils.chainDisplayName(chain) || "Other";
-}
 
 export const SwarmWalletMenu: React.FC<SwarmWalletMenuProps> = ({ reopenWallet }) => {
   const navigate = useNavigate();
@@ -63,45 +54,24 @@ export const SwarmWalletMenu: React.FC<SwarmWalletMenuProps> = ({ reopenWallet }
   }, [open]);
 
   const activeId = currentWallet?.id;
-  const known: WalletType[] = (wallets ?? []).filter((w) => !!w);
+  const groups = groupWallets(wallets ?? []);
 
-  // Sorted by chain, then by id — a stable order, so the same wallet is in the
-  // same place every time the menu opens. `sort` on a copy: the array in
-  // context is shared, and the old selector sorted it where it lay.
-  const sorted = [...known].sort((a, b) => {
-    const byChain = String(a.chain_name).localeCompare(String(b.chain_name));
-    return byChain !== 0 ? byChain : a.id - b.id;
-  });
-
-  const groups: { chain: string; wallets: WalletType[] }[] = [];
-  sorted.forEach((w) => {
-    const chain = chainLabel(w.chain_name);
-    const last = groups[groups.length - 1];
-    if (last && last.chain === chain) last.wallets.push(w);
-    else groups.push({ chain, wallets: [w] });
-  });
-
-  const switchTo = async (wallet: WalletType) => {
-    if (wallet.id === activeId || busy) {
-      setOpen(false);
-      return;
-    }
+  const choose = async (value: string) => {
+    if (busy) return;
     setBusy(true);
     try {
-      await ipcRenderer.invoke("saveSettings", { key: "currentwalletid", value: wallet.id });
       setOpen(false);
-      reopenWallet();
+      await chooseWallet(value, {
+        currentWalletId: activeId,
+        navigate,
+        openErrorModal,
+        reopenWallet,
+      });
     } catch (error) {
-      setOpen(false);
       openErrorModal("Switch wallet", `That wallet could not be opened. ${String(error)}`);
     } finally {
       setBusy(false);
     }
-  };
-
-  const goAdd = (newWalletType: "new" | "seed") => {
-    setOpen(false);
-    navigate(routes.ADDNEWWALLET, { state: { mode: "addnew", newWalletType } });
   };
 
   const name = currentWallet?.alias || currentWallet?.fileName || "No wallet";
@@ -133,7 +103,7 @@ export const SwarmWalletMenu: React.FC<SwarmWalletMenuProps> = ({ reopenWallet }
               {/* The chain heading earns its place only when there is more than
                   one: on this network every wallet is on SWARM Testnet, and a
                   heading that is true of every row below it is noise. */}
-              {groups.length > 1 && <div className={menuStyles.groupLabel}>{group.chain}</div>}
+              {groups.length > 1 && <div className={menuStyles.groupLabel}>{group.label}</div>}
               {group.wallets.map((w) => (
                 <button
                   key={w.id}
@@ -141,7 +111,7 @@ export const SwarmWalletMenu: React.FC<SwarmWalletMenuProps> = ({ reopenWallet }
                   role="menuitemradio"
                   aria-checked={w.id === activeId}
                   className={`${menuStyles.item} ${w.id === activeId ? menuStyles.itemActive : ""}`}
-                  onClick={() => switchTo(w)}
+                  onClick={() => void choose(String(w.id))}
                   disabled={busy}
                 >
                   <span className={menuStyles.tick} aria-hidden="true">
@@ -157,7 +127,7 @@ export const SwarmWalletMenu: React.FC<SwarmWalletMenuProps> = ({ reopenWallet }
           ))}
 
           <div className={menuStyles.sep} />
-          <button type="button" role="menuitem" className={menuStyles.item} onClick={() => goAdd("new")}>
+          <button type="button" role="menuitem" className={menuStyles.item} onClick={() => void choose(ADD_NEW)}>
             <span className={menuStyles.tick} aria-hidden="true">
               +
             </span>
@@ -165,7 +135,7 @@ export const SwarmWalletMenu: React.FC<SwarmWalletMenuProps> = ({ reopenWallet }
               <span className={menuStyles.itemName}>Add a new wallet…</span>
             </span>
           </button>
-          <button type="button" role="menuitem" className={menuStyles.item} onClick={() => goAdd("seed")}>
+          <button type="button" role="menuitem" className={menuStyles.item} onClick={() => void choose(RESTORE)}>
             <span className={menuStyles.tick} aria-hidden="true">
               ↺
             </span>
