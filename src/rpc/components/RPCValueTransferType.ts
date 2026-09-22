@@ -5,6 +5,11 @@ export type RPCValueTransferType = {
   datetime: number;
   kind: ValueTransferKindEnum;
   transaction_fee?: number;
+  // Whether this transfer's transaction is a block's coinbase: a mined
+  // reward rather than a payment. Optional because a wallet built against
+  // an SDK older than privacy-zingolib dc444848 does not send it, and an
+  // absent field must read as "not a reward" rather than as unknown.
+  is_coinbase?: boolean;
   zec_price?: number;
   status: ValueTransferStatusEnum;
   blockheight: number;

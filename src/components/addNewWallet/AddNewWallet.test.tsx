@@ -338,7 +338,7 @@ describe("AddNewWallet on the project chain", () => {
       initialRoute: "/addnewwallet",
       contextOverrides: { openErrorModal },
     });
-    await waitFor(() => expect(screen.getByText(SWARM_DEFAULT_SERVER)).toBeInTheDocument());
+    expect(await screen.findByText(SWARM_DEFAULT_SERVER)).toBeInTheDocument();
     probe.mockResolvedValue(null);
 
     fireEvent.click(screen.getByRole("button", { name: /create wallet/i }));

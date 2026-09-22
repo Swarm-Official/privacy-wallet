@@ -947,6 +947,7 @@ export default class RPC {
         vt.time = tx.datetime;
         vt.type = tx.kind;
         vt.fee = (!tx.transaction_fee ? 0 : tx.transaction_fee) / 10 ** 8;
+        vt.isCoinbase = tx.is_coinbase === true;
         vt.zec_price = !tx.zec_price ? 0 : tx.zec_price;
 
         // unconfirmed means 0 confirmations, the tx is mining already.
