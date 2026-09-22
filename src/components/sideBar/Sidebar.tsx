@@ -7,7 +7,6 @@ import { parseZcashURITargets, ZcashURITarget } from "../../utils/uris";
 import PayURIModal from "./components/PayURIModal";
 import SidebarMenuItem from "./components/SidebarMenuItem";
 import { ContextApp } from "../../context/ContextAppState";
-import { MixnetView } from "../../rpc/components/mixnetPresenter";
 import MixnetModal from "./components/MixnetModal";
 import { Logo } from "../logo";
 import APP_VERSION, { UPSTREAM_VERSION } from "../../version";
@@ -30,7 +29,6 @@ import {
   faTimesCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
 // Modal content for "Wallet Seed Phrase / Viewing Key" extracted to its own
 // component because the inline copy feedback for UFVK / birthday relies on
@@ -186,33 +184,6 @@ type SidebarProps = {
   doRescan: () => void;
 };
 
-// The Sidebar's compact Mixnet Mode line: colour, icon, and label for the
-// current view. Mirrors the sync-status blocks it sits beside.
-function mixnetIndicator(view: MixnetView): {
-  colorClass: string;
-  icon: IconDefinition;
-  label: string;
-  hint?: string;
-} {
-  switch (view.statusKey) {
-    case "mixnet.status.ready":
-      return { colorClass: cstyles.green, icon: faCheck, label: "Mixnet ready" };
-    case "mixnet.status.bootstrapping":
-      return { colorClass: cstyles.yellow, icon: faSync, label: "Mixnet connecting" };
-    case "mixnet.status.off":
-      return { colorClass: cstyles.yellow, icon: faTimesCircle, label: "Mixnet off (clearnet)" };
-    case "mixnet.status.died":
-      return {
-        colorClass: cstyles.red,
-        icon: faTimesCircle,
-        label: "Mixnet died",
-        hint: "Click to restart",
-      };
-    default:
-      return { colorClass: cstyles.red, icon: faTimesCircle, label: "Mixnet unavailable" };
-  }
-}
-
 const Sidebar: React.FC<SidebarProps> = ({ doRescan }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -227,9 +198,7 @@ const Sidebar: React.FC<SidebarProps> = ({ doRescan }) => {
     currentWallet,
     currentWalletOpenError,
     wallets,
-    mixnetView,
   } = context;
-  const mixnetInd = mixnetIndicator(mixnetView);
 
   const [payURIModalIsOpen, setPayURIModalIsOpen] = useState<boolean>(false);
   const [payURIModalInputValue, setPayURIModalInputValue] = useState<string | undefined>(undefined);
@@ -676,34 +645,13 @@ const Sidebar: React.FC<SidebarProps> = ({ doRescan }) => {
             &nbsp; Connecting...
           </div>
         )}
-        {currentWallet && (
-          <button
-            type="button"
-            className={`${cstyles.padsmallall} ${cstyles.margintopsmall} ${cstyles.blackbg}`}
-            onClick={() => setMixnetModalIsOpen(true)}
-            style={{
-              cursor: "pointer",
-              // No background: `.blackbg` on the class list is the background,
-              // and no text-align: the tiles above inherit theirs.
-              border: "none",
-              font: "inherit",
-              color: "inherit",
-              width: "100%",
-            }}
-            title="Nym mixnet settings"
-            aria-label="Nym mixnet settings"
-          >
-            <div>
-              <FontAwesomeIcon icon={mixnetInd.icon} className={mixnetInd.colorClass} />
-              &nbsp; {mixnetInd.label}
-            </div>
-            {mixnetView.narration ? (
-              <div className={cstyles.small}>{mixnetView.narration}</div>
-            ) : (
-              !!mixnetInd.hint && <div className={cstyles.small}>{mixnetInd.hint}</div>
-            )}
-          </button>
-        )}
+        {/*
+          The Nym mixnet tile used to live here, reading "Mixnet off
+          (clearnet)". There is no mixnet on SwarmTestnet, so a line saying it
+          is off described a component the network does not have. The modal
+          stays mounted and the native menu item still opens it; only the
+          status line is gone.
+        */}
       </div>
     </div>
   );

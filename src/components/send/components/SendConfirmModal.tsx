@@ -609,7 +609,11 @@ const SendConfirmModal: React.FC<SendConfirmModalProps> = ({
             {!single && (
               <Field
                 label="Transaction Privacy"
-                value={<PrivacyPill level={privacyLevels.length === recipients.length ? worstPrivacyLevel(privacyLevels) : "…"} />}
+                value={
+                  <PrivacyPill
+                    level={privacyLevels.length === recipients.length ? worstPrivacyLevel(privacyLevels) : "…"}
+                  />
+                }
               />
             )}
           </FieldRow>

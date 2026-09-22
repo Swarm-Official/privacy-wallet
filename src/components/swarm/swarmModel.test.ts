@@ -1,0 +1,310 @@
+import TotalBalanceClass from "../appstate/classes/TotalBalanceClass";
+import ValueTransferClass from "../appstate/classes/ValueTransferClass";
+import UnifiedAddressClass from "../appstate/classes/UnifiedAddressClass";
+import TransparentAddressClass from "../appstate/classes/TransparentAddressClass";
+import { AddressScopeEnum } from "../appstate/enums/AddressScopeEnum";
+import { ValueTransferKindEnum } from "../appstate/enums/ValueTransferKindEnum";
+import { ValueTransferPoolEnum } from "../appstate/enums/ValueTransferPoolEnum";
+import { ValueTransferStatusEnum } from "../appstate/enums/ValueTransferStatusEnum";
+import {
+  chainSees,
+  deriveBalances,
+  deriveOwnAddresses,
+  filterActivity,
+  formatSwm,
+  isBlockReward,
+  isTransparentAddress,
+  maskAmount,
+  searchActivity,
+  toActivityRow,
+  toActivityRows,
+  visibilityOf,
+} from "./swarmModel";
+
+const UTEST = "utest1vjdkw7r3h2mq9m0y8xg0n6w4c2eqk5t8v7lz3h9n4p2r6s0t5v9x3z7b1d5f9h3k7m1q5w9";
+const TM = "tmQ8xR4vK2mE7zD6yP3aH5wR9tCL2nFs0X";
+
+function vt(
+  partial: Partial<ValueTransferClass> & { is_coinbase?: boolean; isCoinbase?: boolean },
+): ValueTransferClass {
+  return {
+    type: ValueTransferKindEnum.received,
+    confirmations: 3,
+    blockheight: 100,
+    status: ValueTransferStatusEnum.confirmed,
+    txid: "abc",
+    time: 1700000000,
+    amount: 1,
+    ...partial,
+  } as ValueTransferClass;
+}
+
+describe("formatSwm", () => {
+  it("always shows at least two decimals", () => {
+    expect(formatSwm(10)).toBe("10.00");
+    expect(formatSwm(0)).toBe("0.00");
+  });
+
+  it("groups thousands", () => {
+    expect(formatSwm(12480.35)).toBe("12,480.35");
+  });
+
+  it("keeps precision the number actually has, and no more", () => {
+    expect(formatSwm(0.0001)).toBe("0.0001");
+    expect(formatSwm(10.5)).toBe("10.50");
+  });
+});
+
+describe("maskAmount", () => {
+  it("blanks the digits and nothing else", () => {
+    expect(maskAmount("12,480.35", true)).toBe("••,•••.••");
+    expect(maskAmount("12,480.35", false)).toBe("12,480.35");
+  });
+});
+
+describe("deriveBalances", () => {
+  const balance = {
+    totalIronwoodBalance: 10,
+    totalSaplingBalance: 1,
+    totalOrchardBalance: 0.5,
+    totalTransparentBalance: 2,
+    confirmedIronwoodBalance: 9,
+    confirmedSaplingBalance: 1,
+    confirmedOrchardBalance: 0.5,
+    confirmedTransparentBalance: 2,
+    totalSpendableBalance: 12.5,
+  } as TotalBalanceClass;
+
+  it("adds every shielded pool into one shielded figure", () => {
+    expect(deriveBalances(balance).shielded).toBeCloseTo(11.5);
+  });
+
+  it("keeps the per-pool split for the breakdown", () => {
+    const pools = deriveBalances(balance).shieldedPools;
+    expect(pools.map((p) => p.label)).toEqual(["Ironwood", "Sapling", "Orchard"]);
+    expect(pools[0].value).toBe(10);
+  });
+
+  it("counts everything, shielded and transparent, into the total", () => {
+    expect(deriveBalances(balance).total).toBeCloseTo(13.5);
+  });
+
+  it("derives pending from what is not yet confirmed", () => {
+    expect(deriveBalances(balance).pending).toBeCloseTo(1);
+  });
+
+  it("never reports a negative pending amount", () => {
+    const racing = { ...balance, confirmedIronwoodBalance: 99 } as TotalBalanceClass;
+    expect(deriveBalances(racing).pending).toBe(0);
+  });
+
+  it("treats a missing balance as zero rather than NaN", () => {
+    const empty = deriveBalances(new TotalBalanceClass());
+    expect(empty.total).toBe(0);
+    expect(Number.isNaN(empty.pending)).toBe(false);
+  });
+});
+
+describe("isTransparentAddress", () => {
+  it("knows this network's transparent prefix", () => {
+    expect(isTransparentAddress(TM)).toBe(true);
+    expect(isTransparentAddress("t1abc")).toBe(true);
+  });
+
+  it("does not mistake a unified address for a transparent one", () => {
+    expect(isTransparentAddress(UTEST)).toBe(false);
+    expect(isTransparentAddress(undefined)).toBe(false);
+  });
+});
+
+describe("visibilityOf", () => {
+  it("calls a transfer revealed when it touched the transparent pool", () => {
+    expect(visibilityOf(vt({ poolsReceived: [ValueTransferPoolEnum.transparent] }))).toBe("revealed");
+    expect(visibilityOf(vt({ poolsSentFrom: [ValueTransferPoolEnum.transparent] }))).toBe("revealed");
+  });
+
+  it("calls it shielded when every pool it touched was shielded", () => {
+    expect(visibilityOf(vt({ poolsReceived: [ValueTransferPoolEnum.ironwood] }))).toBe("shielded");
+    expect(visibilityOf(vt({ poolsReceived: [ValueTransferPoolEnum.sapling] }))).toBe("shielded");
+  });
+
+  it("falls back to the recipient address when no pools are reported", () => {
+    expect(visibilityOf(vt({ address: TM }))).toBe("revealed");
+    expect(visibilityOf(vt({ address: UTEST }))).toBe("shielded");
+  });
+});
+
+describe("isBlockReward", () => {
+  // The whole point of the flag. Every one of these looks exactly like a
+  // coinbase receipt from the outside, and none of them is one.
+  it("never infers a reward from a missing sender, an absent memo or a zero fee", () => {
+    expect(isBlockReward(vt({ amount: 6.25, address: undefined, fee: 0, memos: undefined }))).toBe(false);
+  });
+
+  it("is false while the wallet does not report the flag at all", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received }))).toBe(false);
+  });
+
+  it("reads the flag zingolib puts in the value-transfer JSON", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received, is_coinbase: true }))).toBe(true);
+  });
+
+  it("reads the mapped name too, so it survives the renderer's own field", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received, isCoinbase: true }))).toBe(true);
+  });
+
+  it("treats an explicit false as an ordinary payment", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received, is_coinbase: false }))).toBe(false);
+  });
+
+  // A reward is money arriving. A flagged send would be the flag misread.
+  it("only ever applies to a receipt", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.sent, is_coinbase: true }))).toBe(false);
+  });
+});
+
+describe("toActivityRow", () => {
+  it("signs an incoming transfer positive and an outgoing one negative", () => {
+    expect(toActivityRow(vt({ type: ValueTransferKindEnum.received, amount: 84.2 }), 0).amount).toBe("+84.20");
+    expect(toActivityRow(vt({ type: ValueTransferKindEnum.sent, amount: 250 }), 0).amount).toBe("−250.00");
+  });
+
+  it("marks a send to a transparent address REVEALED", () => {
+    const row = toActivityRow(
+      vt({
+        type: ValueTransferKindEnum.sent,
+        address: TM,
+        poolsReceived: [ValueTransferPoolEnum.transparent],
+      }),
+      0,
+    );
+    expect(row.visibility).toBe("revealed");
+    expect(row.state).toBe("REVEALED");
+  });
+
+  it("marks an unconfirmed transfer PENDING rather than shielded", () => {
+    expect(toActivityRow(vt({ confirmations: 0 }), 0).state).toBe("PENDING");
+  });
+
+  it("marks a failed transfer FAILED", () => {
+    expect(toActivityRow(vt({ status: ValueTransferStatusEnum.failed }), 0).state).toBe("FAILED");
+  });
+
+  it("says who it cannot name instead of leaving the line blank", () => {
+    const row = toActivityRow(vt({ type: ValueTransferKindEnum.received, address: undefined }), 0);
+    expect(row.subtitle).toBe("from a shielded address");
+  });
+
+  it("names shielding as shielding", () => {
+    expect(toActivityRow(vt({ type: ValueTransferKindEnum.shield }), 0).title).toBe("Shielded funds");
+  });
+
+  it("tags a flagged receipt MINED and names its block", () => {
+    const row = toActivityRow(vt({ type: ValueTransferKindEnum.received, is_coinbase: true, blockheight: 12041 }), 0);
+    expect(row.title).toBe("Block reward");
+    expect(row.state).toBe("MINED");
+    expect(row.mined).toBe(true);
+    expect(row.subtitle).toBe("block #12041");
+  });
+
+  // Maturity is a confirmation count, not this flag. An unconfirmed reward is
+  // still pending, and saying MINED over it would imply it could be spent.
+  it("leaves an unconfirmed reward pending rather than mined", () => {
+    expect(
+      toActivityRow(vt({ type: ValueTransferKindEnum.received, is_coinbase: true, confirmations: 0 }), 0).state,
+    ).toBe("PENDING");
+  });
+});
+
+describe("filterActivity", () => {
+  const rows = toActivityRows([
+    vt({ type: ValueTransferKindEnum.received, poolsReceived: [ValueTransferPoolEnum.ironwood], memos: ["hello"] }),
+    vt({ type: ValueTransferKindEnum.sent, poolsReceived: [ValueTransferPoolEnum.transparent], address: TM }),
+    vt({ type: ValueTransferKindEnum.received, poolsReceived: [ValueTransferPoolEnum.sapling] }),
+  ]);
+
+  it("keeps everything by default", () => {
+    expect(filterActivity(rows, "all")).toHaveLength(3);
+  });
+
+  it("separates shielded from revealed", () => {
+    expect(filterActivity(rows, "shielded")).toHaveLength(2);
+    expect(filterActivity(rows, "revealed")).toHaveLength(1);
+  });
+
+  // The old app had a separate Messages screen. A memo is a property of a
+  // transfer, so here it is a filter over the one list.
+  it("finds the transfers that carry a memo", () => {
+    expect(filterActivity(rows, "memos")).toHaveLength(1);
+  });
+
+  it("lists mined rewards only when the wallet flagged them", () => {
+    expect(filterActivity(rows, "mined")).toHaveLength(0);
+    const withReward = toActivityRows([vt({ type: ValueTransferKindEnum.received, is_coinbase: true })]);
+    expect(filterActivity(withReward, "mined")).toHaveLength(1);
+  });
+});
+
+describe("searchActivity", () => {
+  const rows = toActivityRows([
+    vt({ type: ValueTransferKindEnum.received, memos: ["Invoice #2291"], txid: "f3a9c1e7" }),
+    vt({ type: ValueTransferKindEnum.sent, address: TM, txid: "9b04d2aa" }),
+  ]);
+
+  it("matches a memo, a hash and an address", () => {
+    expect(searchActivity(rows, "invoice")).toHaveLength(1);
+    expect(searchActivity(rows, "9b04")).toHaveLength(1);
+    expect(searchActivity(rows, TM.slice(0, 6))).toHaveLength(1);
+  });
+
+  it("returns everything for an empty query", () => {
+    expect(searchActivity(rows, "  ")).toHaveLength(2);
+  });
+});
+
+describe("deriveOwnAddresses", () => {
+  it("lists shielded addresses before transparent ones", () => {
+    const rows = deriveOwnAddresses(
+      [new UnifiedAddressClass(0, 0, UTEST, false, true, true)],
+      [
+        {
+          account: 0,
+          address_index: 0,
+          scope: AddressScopeEnum.external,
+          encoded_address: TM,
+        } as TransparentAddressClass,
+      ],
+    );
+    expect(rows.map((r) => r.kind)).toEqual(["shielded", "transparent"]);
+    expect(rows[0].address).toBe(UTEST);
+  });
+
+  it("survives a wallet with no addresses yet", () => {
+    expect(deriveOwnAddresses([], [])).toEqual([]);
+  });
+});
+
+describe("chainSees", () => {
+  it("says a shielded payment publishes its existence and its fee, and nothing else", () => {
+    const facts = chainSees({ shielded: true, fee: "0.0001", ticker: "SWM" });
+    const byKey = Object.fromEntries(facts.map((f) => [f.key, f.value]));
+    expect(byKey["Sender"]).toBe("hidden");
+    expect(byKey["Recipient"]).toBe("hidden");
+    expect(byKey["Amount"]).toBe("hidden");
+    expect(byKey["Fee"]).toBe("0.0001 SWM");
+    expect(byKey["That a transaction happened"]).toBe("yes");
+  });
+
+  it("says a transparent payment publishes the address and the amount", () => {
+    const facts = chainSees({ shielded: false, address: TM, amount: "250.00", ticker: "SWM" });
+    const byKey = Object.fromEntries(facts.map((f) => [f.key, f.value]));
+    expect(byKey["Amount"]).toBe("250.00 SWM");
+    expect(byKey["Recipient address"]).toContain("tmQ8xR4vK2");
+  });
+
+  // Nothing here may claim to know what a chain analyst could infer.
+  it("claims nothing beyond what the chain records", () => {
+    const keys = chainSees({ shielded: true, ticker: "SWM" }).map((f) => f.key);
+    expect(keys).toEqual(["That a transaction happened", "Sender", "Recipient", "Amount", "Memo", "Fee"]);
+  });
+});

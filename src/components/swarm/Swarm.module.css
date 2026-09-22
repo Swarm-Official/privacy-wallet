@@ -1,0 +1,1498 @@
+/*
+ * Accessibility, decided once here rather than per component.
+ *
+ * The three faintest text tokens in the palette do not clear WCAG AA against
+ * these surfaces — #7d746a reaches 4.2:1, #6b645a 3.3:1 and #544e45 2.3:1,
+ * where small text needs 4.5:1. They are lovely and they were unreadable, so
+ * every secondary line in these screens uses --swarm-text-muted (7.4:1) and
+ * the hierarchy is carried by size and weight instead of by contrast. The
+ * tokens themselves are untouched: they are the style guide's.
+ */
+
+/*
+ * The SWARM wallet's own surface.
+ *
+ * Every colour, radius and family here is a token from Global.css — the style
+ * guide's, not a second palette invented beside it. Sizes follow the desktop
+ * mockup (1180x740 frame, 232px rail); the layout is fluid so the real window
+ * can be any size without the screens breaking.
+ */
+
+/*
+ * The application's own stylesheet does not set this globally, and a row with
+ * `width: 100%` and padding then measures wider than the panel it sits in —
+ * which is how the Settings values ended up cut off at the card's edge.
+ */
+.shell,
+.shell *,
+.shell *::before,
+.shell *::after {
+  box-sizing: border-box;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--swarm-surface);
+  color: var(--swarm-text);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------- rail --- */
+
+.rail {
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--swarm-surface-sunken);
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 18px;
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--swarm-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.18s ease;
+}
+
+.navItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.navItem svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--swarm-text-muted);
+}
+
+.navItemActive {
+  font-weight: 600;
+  color: var(--swarm-text);
+  background: var(--swarm-orange-wash);
+}
+
+.navItemActive svg {
+  color: var(--swarm-orange);
+}
+
+.railFoot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --------------------------------------------------------- status chip --- */
+
+.statusChip {
+  padding: 14px;
+  border-radius: var(--radius-l);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--swarm-surface);
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: default;
+}
+
+.statusHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.statusDetail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-muted);
+  margin-top: 6px;
+  word-break: break-all;
+}
+
+.statusSynced {
+  color: var(--swarm-green);
+}
+.statusSynced .statusDot {
+  background: var(--swarm-green);
+  box-shadow: 0 0 8px var(--swarm-green);
+  animation: swarmPulse 2s ease-in-out infinite;
+}
+
+.statusSyncing {
+  color: var(--swarm-honey);
+}
+.statusSyncing .statusDot {
+  background: var(--swarm-honey);
+  box-shadow: 0 0 8px var(--swarm-honey);
+  animation: swarmPulse 1.2s ease-in-out infinite;
+}
+
+.statusDisconnected {
+  color: var(--swarm-red);
+}
+.statusDisconnected .statusDot {
+  background: var(--swarm-red);
+}
+
+.versionLine {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1.7;
+  letter-spacing: 0.06em;
+  color: var(--swarm-text-muted);
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------- main --- */
+
+.main {
+  padding: 20px 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--swarm-surface);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--swarm-text-muted);
+}
+
+.screenTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  margin-top: 4px;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pillButton {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--swarm-text-soft);
+}
+
+.pillButton:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.privacyPill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-orange-edge);
+  background: rgba(255, 138, 31, 0.07);
+}
+
+.privacyTag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--swarm-orange);
+}
+
+.privacySub {
+  font-size: 11.5px;
+  color: var(--swarm-text-muted);
+  margin-top: 1px;
+}
+
+/* --------------------------------------------------------- problem bar --- */
+
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--swarm-red-edge);
+  background: rgba(255, 92, 92, 0.07);
+}
+
+.problemIcon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--swarm-red);
+}
+
+.problemBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.problemHeadline {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--swarm-text);
+}
+
+.problemText {
+  font-size: 12.5px;
+  color: var(--swarm-text-muted);
+  margin-top: 4px;
+}
+
+.problemActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.details {
+  margin-top: 10px;
+}
+
+.detailsSummary {
+  font-size: 12px;
+  color: var(--swarm-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border-radius: var(--radius-s);
+}
+
+.detailsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.detailsSummary::before {
+  content: "▸";
+  font-size: 10px;
+  color: var(--swarm-text-muted);
+}
+
+details[open] > .detailsSummary::before {
+  content: "▾";
+}
+
+.detailsBody {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--swarm-hairline);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--swarm-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow: auto;
+}
+
+/* -------------------------------------------------------- balance card --- */
+
+.balanceCard {
+  position: relative;
+  padding: 20px 26px;
+  border-radius: 18px;
+  border: 1px solid var(--swarm-orange-edge);
+  background: linear-gradient(160deg, rgba(255, 138, 31, 0.14), #15110d 60%);
+  overflow: hidden;
+  flex: none;
+}
+
+.balanceFlow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--swarm-orange), transparent);
+  background-size: 200% 100%;
+  animation: swarmFlowX 3s linear infinite;
+}
+
+.balanceBee {
+  position: absolute;
+  right: 34px;
+  top: 26px;
+  opacity: 0.9;
+}
+
+.balanceInner {
+  position: relative;
+  z-index: 1;
+}
+
+.balanceKicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--swarm-text-muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-orange-edge);
+  color: var(--swarm-orange);
+}
+
+.badge .statusDot {
+  background: currentColor;
+}
+
+.balanceValue {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 46px;
+  letter-spacing: -0.03em;
+  margin-top: 10px;
+  line-height: 1;
+  word-break: break-all;
+}
+
+.balanceTicker {
+  font-size: 22px;
+  color: var(--swarm-orange);
+  font-weight: 600;
+}
+
+.balanceNote {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--swarm-text-muted);
+  margin-top: 10px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+/* -------------------------------------------------------------- buttons --- */
+
+.btn {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 11px 20px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--swarm-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btnPrimary {
+  border-color: var(--swarm-orange);
+  background: var(--swarm-orange);
+  color: var(--swarm-on-orange);
+  box-shadow: 0 0 24px var(--swarm-orange-glow);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--swarm-honey);
+  box-shadow: 0 0 36px rgba(255, 138, 31, 0.6);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btnSmall {
+  font-size: 12px;
+  padding: 7px 12px;
+}
+
+.btnWide {
+  width: 100%;
+  justify-content: center;
+  padding: 13px;
+  font-size: 14px;
+  border-radius: 11px;
+}
+
+/* ---------------------------------------------------------------- cards --- */
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  flex: none;
+}
+
+.statCard {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--swarm-hairline);
+  background: var(--swarm-surface-raised);
+  min-width: 0;
+}
+
+.statCardShielded {
+  border-color: rgba(255, 138, 31, 0.3);
+}
+.statCardTransparent {
+  border-color: rgba(111, 182, 255, 0.3);
+}
+.statCardPending {
+  border-color: rgba(255, 176, 32, 0.3);
+}
+
+.statKicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.statNote {
+  font-size: 11.5px;
+  color: var(--swarm-text-muted);
+  margin-top: 4px;
+}
+
+.statMore {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--swarm-honey);
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.popover {
+  position: absolute;
+  z-index: 20;
+  left: 12px;
+  right: 12px;
+  top: calc(100% - 6px);
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-orange-edge);
+  background: #1b1713;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+.popoverRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 3px 0;
+  color: var(--swarm-text-soft);
+}
+
+.popoverRow span:first-child {
+  color: var(--swarm-text-muted);
+}
+
+/* ----------------------------------------------------------- panel/list --- */
+
+.panelGrid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 260px;
+}
+
+.panel {
+  border: 1px solid var(--swarm-hairline);
+  border-radius: var(--radius-xl);
+  background: var(--swarm-surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex: none;
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.panelLink {
+  font-size: 12px;
+  color: var(--swarm-honey);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  padding: 4px 6px;
+  border-radius: var(--radius-s);
+}
+
+.panelBody {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.panelPad {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rowItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font-family: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.rowItem:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rowIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-m);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.rowIconShielded {
+  background: rgba(255, 138, 31, 0.08);
+  border: 1px solid rgba(255, 138, 31, 0.25);
+  color: var(--swarm-orange);
+}
+
+.rowIconRevealed {
+  background: rgba(111, 182, 255, 0.08);
+  border: 1px solid rgba(111, 182, 255, 0.3);
+  color: var(--swarm-clear-blue);
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rowTitle {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.rowMeta {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-muted);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  flex: none;
+}
+
+.rowAmount {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rowAmountIn {
+  color: var(--swarm-honey-light);
+}
+.rowAmountOut {
+  color: var(--swarm-text-soft);
+}
+
+.rowState {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  margin-top: 4px;
+}
+
+.stateShielded {
+  color: var(--swarm-orange);
+}
+.stateRevealed {
+  color: var(--swarm-clear-blue);
+}
+.statePending {
+  color: var(--swarm-honey);
+}
+.stateFailed {
+  color: var(--swarm-red);
+}
+
+.rowState .statusDot {
+  background: currentColor;
+}
+
+.empty {
+  padding: 34px 20px;
+  text-align: center;
+  color: var(--swarm-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---------------------------------------------------------------- forms --- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--swarm-text-muted);
+  margin-bottom: 8px;
+}
+
+.labelHint {
+  color: var(--swarm-text-muted);
+  font-weight: 400;
+}
+
+.input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 11px 13px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+  color: var(--swarm-text);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--swarm-text-muted);
+}
+
+.input:focus {
+  border-color: var(--swarm-orange);
+  box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.2);
+}
+
+.inputText {
+  font-family: var(--font-text);
+  font-size: 13px;
+}
+
+.amountBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+}
+
+.amountBox:focus-within {
+  border-color: var(--swarm-orange);
+  box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.2);
+}
+
+.amountInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-family: var(--font-mono);
+  background: none;
+  border: none;
+  color: var(--swarm-text);
+  outline: none;
+  padding: 5px 0;
+}
+
+.amountTicker {
+  color: var(--swarm-honey);
+  font-size: 12px;
+  flex: none;
+}
+
+.fieldNote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-muted);
+  margin-top: 7px;
+}
+
+.fieldOk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--swarm-green);
+  margin-top: 7px;
+}
+
+.fieldBad {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--swarm-red);
+  margin-top: 7px;
+}
+
+.sendModeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-orange-edge);
+  background: rgba(255, 138, 31, 0.07);
+  gap: 10px;
+}
+
+.sendModeRowRevealed {
+  border-color: var(--swarm-clear-blue-edge);
+  background: var(--swarm-clear-blue-wash);
+}
+
+.sendModeLabel {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+}
+
+.sendModeFee {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-muted);
+}
+
+/* ------------------------------------------------------------ utilities --- */
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.muted {
+  color: var(--swarm-text-muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * One visible focus ring for everything interactive. The old screens had none,
+ * which made the app unusable from the keyboard; `:focus-visible` keeps it off
+ * the mouse path.
+ */
+.shell :focus-visible,
+.onboardFrame :focus-visible,
+.onboardWrap :focus-visible {
+  outline: 2px solid var(--swarm-honey);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes swarmPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes swarmFlowX {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell *,
+  .shell *::before,
+  .shell *::after,
+  .onboardFrame *,
+  .onboardWrap * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ------------------------------------------------------------ send/two-up --- */
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+  align-items: start;
+  min-height: 0;
+}
+
+.sideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.fromBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+}
+
+.fromMark {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-s);
+  background: rgba(255, 138, 31, 0.15);
+  border: 1px solid var(--swarm-orange-edge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--swarm-orange);
+}
+
+.inputRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.inputRow .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.fieldWarn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--swarm-clear-blue);
+  margin-top: 7px;
+}
+
+.amountInputLarge {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.maxButton {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 176, 32, 0.4);
+  background: rgba(255, 176, 32, 0.1);
+  color: var(--swarm-honey-light);
+  cursor: pointer;
+  flex: none;
+}
+
+.maxButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chainCard {
+  border-color: var(--swarm-orange-edge);
+  background: linear-gradient(160deg, rgba(255, 138, 31, 0.12), #15110d 60%);
+}
+
+.chainCardRevealed {
+  border-color: var(--swarm-clear-blue-edge);
+  background: linear-gradient(160deg, rgba(111, 182, 255, 0.12), #0f1319 60%);
+}
+
+.chainKicker,
+.chainKickerRevealed {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+}
+
+.chainKicker {
+  color: var(--swarm-orange);
+}
+
+.chainKickerRevealed {
+  color: var(--swarm-clear-blue);
+}
+
+.factList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.factRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--swarm-text-muted);
+}
+
+.factRow > span:last-child {
+  font-family: var(--font-mono);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.factHidden {
+  color: var(--swarm-honey-light);
+  letter-spacing: 0.06em;
+}
+
+.factVisible {
+  color: var(--swarm-text-soft);
+}
+
+.factTotal {
+  padding-top: 9px;
+  border-top: 1px solid var(--swarm-hairline);
+  font-weight: 600;
+  color: var(--swarm-text);
+}
+
+.factTotal > span:last-child {
+  color: var(--swarm-honey-light);
+}
+
+/* ------------------------------------------------------- receive/activity --- */
+
+.qrFrame {
+  align-self: center;
+  padding: 12px;
+  border-radius: var(--radius-xl);
+  background: var(--swarm-text);
+  line-height: 0;
+}
+
+.addressBlock {
+  padding: 11px 13px;
+  border-radius: var(--radius-m);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--swarm-hairline);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--swarm-honey-light);
+  word-break: break-all;
+}
+
+.addressInline {
+  font-size: 11.5px;
+  color: var(--swarm-text-muted);
+  word-break: break-all;
+}
+
+.memoBlock {
+  padding: 11px 13px;
+  border-radius: var(--radius-m);
+  background: var(--swarm-surface-raised);
+  border: 1px solid var(--swarm-hairline);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--swarm-text-soft);
+  overflow-wrap: anywhere;
+}
+
+.guidance {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--swarm-text-muted);
+}
+
+.guidanceRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.guidanceRow strong {
+  color: var(--swarm-text);
+  font-weight: 600;
+}
+
+.guidanceMark {
+  flex: none;
+  margin-top: 2px;
+  color: var(--swarm-orange);
+  display: flex;
+}
+
+.pendingDot {
+  width: 8px;
+  height: 8px;
+  background: var(--swarm-honey);
+  box-shadow: 0 0 8px var(--swarm-honey);
+  animation: swarmPulse 1.5s infinite;
+  flex: none;
+}
+
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: none;
+}
+
+.chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-hairline-strong);
+  background: transparent;
+  color: var(--swarm-text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--swarm-text-soft);
+}
+
+.chipActive {
+  border-color: var(--swarm-orange);
+  background: var(--swarm-orange-wash);
+  color: var(--swarm-text);
+}
+
+.searchWrap {
+  position: relative;
+  margin-left: auto;
+  min-width: 240px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--swarm-text-muted);
+  display: flex;
+  pointer-events: none;
+}
+
+.searchInput {
+  padding-left: 34px;
+  border-radius: 999px;
+}
+
+.activityGrid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 300px;
+}
+
+.rowItemSelected {
+  background: var(--swarm-orange-wash);
+}
+
+.rowItemSelected:hover {
+  background: var(--swarm-orange-wash);
+}
+
+.stateMined {
+  color: var(--swarm-honey);
+}
+
+/* ------------------------------------------------------ addresses/settings --- */
+
+.sectionHeading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
+  color: var(--swarm-text);
+}
+
+.contactMark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--swarm-surface-raised);
+  border: 1px solid var(--swarm-hairline-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--swarm-text-soft);
+}
+
+.contactActions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.addContact {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.addContactActions {
+  display: flex;
+  gap: 8px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-content: start;
+}
+
+.settingValue {
+  font-size: 12px;
+  color: var(--swarm-text-muted);
+  text-align: right;
+  flex: none;
+  max-width: 45%;
+  overflow-wrap: anywhere;
+}
+
+.licence {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--swarm-text-muted);
+  padding-top: 12px;
+  border-top: 1px solid var(--swarm-hairline);
+}
+
+/* ------------------------------------------------------------ onboarding --- */
+
+.onboardWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0 40px;
+}
+
+.onboardCard {
+  width: 100%;
+  max-width: 560px;
+  padding: 32px;
+  border-radius: 20px;
+  border: 1px solid var(--swarm-orange-edge);
+  background: linear-gradient(160deg, rgba(255, 138, 31, 0.12), #15110d 60%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.onboardBee {
+  align-self: center;
+  margin-bottom: 6px;
+}
+
+.onboardTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 4px 0 0;
+}
+
+.onboardBody {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--swarm-text-muted);
+  margin: 0;
+}
+
+.onboardWarn {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: var(--radius-l);
+  border: 1px solid rgba(255, 176, 32, 0.4);
+  background: rgba(255, 176, 32, 0.07);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--swarm-text-soft);
+  margin-top: 6px;
+}
+
+.onboardWarn strong {
+  color: var(--swarm-text);
+  font-weight: 600;
+}
+
+.onboardWarn .problemIcon {
+  color: var(--swarm-honey);
+}
+
+.onboardActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.onboardFrame {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 22px 26px 26px;
+  background: var(--swarm-surface);
+  color: var(--swarm-text);
+  font-family: var(--font-text);
+}
+
+.onboardHead {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.onboardHead .brand {
+  padding: 0;
+}
+
+.stepRail {
+  display: flex;
+  gap: 16px;
+  list-style: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--swarm-text-muted);
+}
+
+.stepActive {
+  color: var(--swarm-honey);
+}
+
+.stepDot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.onboardNote {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid rgba(255, 176, 32, 0.35);
+  background: rgba(255, 176, 32, 0.06);
+  font-size: 12.5px;
+  color: var(--swarm-text-soft);
+}
+
+.onboardNote svg {
+  flex: none;
+  color: var(--swarm-honey);
+}
+
+.onboardForm {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
