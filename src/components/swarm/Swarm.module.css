@@ -1,0 +1,940 @@
+/*
+ * The SWARM wallet's own surface.
+ *
+ * Every colour, radius and family here is a token from Global.css — the style
+ * guide's, not a second palette invented beside it. Sizes follow the desktop
+ * mockup (1180x740 frame, 232px rail); the layout is fluid so the real window
+ * can be any size without the screens breaking.
+ */
+
+.shell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--swarm-surface);
+  color: var(--swarm-text);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------- rail --- */
+
+.rail {
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--swarm-surface-sunken);
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 18px;
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--swarm-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.18s ease;
+}
+
+.navItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.navItem svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--swarm-text-faint);
+}
+
+.navItemActive {
+  font-weight: 600;
+  color: var(--swarm-text);
+  background: var(--swarm-orange-wash);
+}
+
+.navItemActive svg {
+  color: var(--swarm-orange);
+}
+
+.railFoot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --------------------------------------------------------- status chip --- */
+
+.statusChip {
+  padding: 14px;
+  border-radius: var(--radius-l);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--swarm-surface);
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: default;
+}
+
+.statusHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.statusDetail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-faint);
+  margin-top: 6px;
+  word-break: break-all;
+}
+
+.statusSynced {
+  color: var(--swarm-green);
+}
+.statusSynced .statusDot {
+  background: var(--swarm-green);
+  box-shadow: 0 0 8px var(--swarm-green);
+  animation: swarmPulse 2s ease-in-out infinite;
+}
+
+.statusSyncing {
+  color: var(--swarm-honey);
+}
+.statusSyncing .statusDot {
+  background: var(--swarm-honey);
+  box-shadow: 0 0 8px var(--swarm-honey);
+  animation: swarmPulse 1.2s ease-in-out infinite;
+}
+
+.statusDisconnected {
+  color: var(--swarm-red);
+}
+.statusDisconnected .statusDot {
+  background: var(--swarm-red);
+}
+
+.versionLine {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--swarm-text-disabled);
+  padding: 0 4px;
+}
+
+/* ---------------------------------------------------------------- main --- */
+
+.main {
+  padding: 24px 30px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--swarm-surface);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--swarm-text-dim);
+}
+
+.screenTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  margin-top: 4px;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pillButton {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--swarm-text-soft);
+}
+
+.pillButton:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.privacyPill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-orange-edge);
+  background: rgba(255, 138, 31, 0.07);
+}
+
+.privacyTag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--swarm-orange);
+}
+
+.privacySub {
+  font-size: 11.5px;
+  color: var(--swarm-text-muted);
+  margin-top: 1px;
+}
+
+/* --------------------------------------------------------- problem bar --- */
+
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--swarm-red-edge);
+  background: rgba(255, 92, 92, 0.07);
+}
+
+.problemIcon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--swarm-red);
+}
+
+.problemBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.problemHeadline {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--swarm-text);
+}
+
+.problemText {
+  font-size: 12.5px;
+  color: var(--swarm-text-muted);
+  margin-top: 4px;
+}
+
+.problemActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.details {
+  margin-top: 10px;
+}
+
+.detailsSummary {
+  font-size: 12px;
+  color: var(--swarm-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border-radius: var(--radius-s);
+}
+
+.detailsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.detailsSummary::before {
+  content: "▸";
+  font-size: 10px;
+  color: var(--swarm-text-dim);
+}
+
+details[open] > .detailsSummary::before {
+  content: "▾";
+}
+
+.detailsBody {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--swarm-hairline);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--swarm-text-faint);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow: auto;
+}
+
+/* -------------------------------------------------------- balance card --- */
+
+.balanceCard {
+  position: relative;
+  padding: 26px 30px;
+  border-radius: 18px;
+  border: 1px solid var(--swarm-orange-edge);
+  background: linear-gradient(160deg, rgba(255, 138, 31, 0.14), #15110d 60%);
+  overflow: hidden;
+  flex: none;
+}
+
+.balanceFlow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--swarm-orange), transparent);
+  background-size: 200% 100%;
+  animation: swarmFlowX 3s linear infinite;
+}
+
+.balanceBee {
+  position: absolute;
+  right: 34px;
+  top: 26px;
+  opacity: 0.9;
+}
+
+.balanceInner {
+  position: relative;
+  z-index: 1;
+}
+
+.balanceKicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--swarm-text-faint);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-orange-edge);
+  color: var(--swarm-orange);
+}
+
+.badge .statusDot {
+  background: currentColor;
+}
+
+.balanceValue {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 52px;
+  letter-spacing: -0.03em;
+  margin-top: 12px;
+  line-height: 1;
+  word-break: break-all;
+}
+
+.balanceTicker {
+  font-size: 22px;
+  color: var(--swarm-orange);
+  font-weight: 600;
+}
+
+.balanceNote {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--swarm-text-muted);
+  margin-top: 10px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+
+/* -------------------------------------------------------------- buttons --- */
+
+.btn {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 11px 20px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--swarm-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btnPrimary {
+  border-color: var(--swarm-orange);
+  background: var(--swarm-orange);
+  color: var(--swarm-on-orange);
+  box-shadow: 0 0 24px var(--swarm-orange-glow);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--swarm-honey);
+  box-shadow: 0 0 36px rgba(255, 138, 31, 0.6);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btnSmall {
+  font-size: 12px;
+  padding: 7px 12px;
+}
+
+.btnWide {
+  width: 100%;
+  justify-content: center;
+  padding: 13px;
+  font-size: 14px;
+  border-radius: 11px;
+}
+
+/* ---------------------------------------------------------------- cards --- */
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  flex: none;
+}
+
+.statCard {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--swarm-hairline);
+  background: var(--swarm-surface-raised);
+  min-width: 0;
+}
+
+.statCardShielded {
+  border-color: rgba(255, 138, 31, 0.3);
+}
+.statCardTransparent {
+  border-color: rgba(111, 182, 255, 0.3);
+}
+.statCardPending {
+  border-color: rgba(255, 176, 32, 0.3);
+}
+
+.statKicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.statNote {
+  font-size: 11.5px;
+  color: var(--swarm-text-faint);
+  margin-top: 4px;
+}
+
+.statMore {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--swarm-honey);
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.popover {
+  position: absolute;
+  z-index: 20;
+  left: 12px;
+  right: 12px;
+  top: calc(100% - 6px);
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-orange-edge);
+  background: #1b1713;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+
+.popoverRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 3px 0;
+  color: var(--swarm-text-soft);
+}
+
+.popoverRow span:first-child {
+  color: var(--swarm-text-faint);
+}
+
+/* ----------------------------------------------------------- panel/list --- */
+
+.panelGrid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 18px;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  border: 1px solid var(--swarm-hairline);
+  border-radius: var(--radius-xl);
+  background: var(--swarm-surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex: none;
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.panelLink {
+  font-size: 12px;
+  color: var(--swarm-honey);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  padding: 4px 6px;
+  border-radius: var(--radius-s);
+}
+
+.panelBody {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.panelPad {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rowItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font-family: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.rowItem:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rowIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-m);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.rowIconShielded {
+  background: rgba(255, 138, 31, 0.08);
+  border: 1px solid rgba(255, 138, 31, 0.25);
+  color: var(--swarm-orange);
+}
+
+.rowIconRevealed {
+  background: rgba(111, 182, 255, 0.08);
+  border: 1px solid rgba(111, 182, 255, 0.3);
+  color: var(--swarm-clear-blue);
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowTitle {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.rowMeta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-faint);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowRight {
+  text-align: right;
+  flex: none;
+}
+
+.rowAmount {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.rowAmountIn {
+  color: var(--swarm-honey-light);
+}
+.rowAmountOut {
+  color: var(--swarm-text-soft);
+}
+
+.rowState {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  margin-top: 4px;
+}
+
+.stateShielded {
+  color: var(--swarm-orange);
+}
+.stateRevealed {
+  color: var(--swarm-clear-blue);
+}
+.statePending {
+  color: var(--swarm-honey);
+}
+.stateFailed {
+  color: var(--swarm-red);
+}
+
+.rowState .statusDot {
+  background: currentColor;
+}
+
+.empty {
+  padding: 34px 20px;
+  text-align: center;
+  color: var(--swarm-text-faint);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---------------------------------------------------------------- forms --- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--swarm-text-muted);
+  margin-bottom: 8px;
+}
+
+.labelHint {
+  color: var(--swarm-text-dim);
+  font-weight: 400;
+}
+
+.input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 11px 13px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+  color: var(--swarm-text);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--swarm-text-dim);
+}
+
+.input:focus {
+  border-color: var(--swarm-orange);
+  box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.2);
+}
+
+.inputText {
+  font-family: var(--font-text);
+  font-size: 13px;
+}
+
+.amountBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+}
+
+.amountBox:focus-within {
+  border-color: var(--swarm-orange);
+  box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.2);
+}
+
+.amountInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-family: var(--font-mono);
+  background: none;
+  border: none;
+  color: var(--swarm-text);
+  outline: none;
+  padding: 5px 0;
+}
+
+.amountTicker {
+  color: var(--swarm-honey);
+  font-size: 12px;
+  flex: none;
+}
+
+.fieldNote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-faint);
+  margin-top: 7px;
+}
+
+.fieldOk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--swarm-green);
+  margin-top: 7px;
+}
+
+.fieldBad {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--swarm-red);
+  margin-top: 7px;
+}
+
+.sendModeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-orange-edge);
+  background: rgba(255, 138, 31, 0.07);
+  gap: 10px;
+}
+
+.sendModeRowRevealed {
+  border-color: var(--swarm-clear-blue-edge);
+  background: var(--swarm-clear-blue-wash);
+}
+
+.sendModeLabel {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+}
+
+.sendModeFee {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--swarm-text-faint);
+}
+
+/* ------------------------------------------------------------ utilities --- */
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.muted {
+  color: var(--swarm-text-faint);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * One visible focus ring for everything interactive. The old screens had none,
+ * which made the app unusable from the keyboard; `:focus-visible` keeps it off
+ * the mouse path.
+ */
+.shell :focus-visible {
+  outline: 2px solid var(--swarm-honey);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes swarmPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes swarmFlowX {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell *,
+  .shell *::before,
+  .shell *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
