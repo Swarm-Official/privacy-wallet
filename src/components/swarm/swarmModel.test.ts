@@ -24,7 +24,9 @@ import {
 const UTEST = "utest1vjdkw7r3h2mq9m0y8xg0n6w4c2eqk5t8v7lz3h9n4p2r6s0t5v9x3z7b1d5f9h3k7m1q5w9";
 const TM = "tmQ8xR4vK2mE7zD6yP3aH5wR9tCL2nFs0X";
 
-function vt(partial: Partial<ValueTransferClass>): ValueTransferClass {
+function vt(
+  partial: Partial<ValueTransferClass> & { is_coinbase?: boolean; isCoinbase?: boolean },
+): ValueTransferClass {
   return {
     type: ValueTransferKindEnum.received,
     confirmations: 3,
@@ -133,12 +135,31 @@ describe("visibilityOf", () => {
 });
 
 describe("isBlockReward", () => {
-  // Locked down on purpose. The value-transfer contract carries no coinbase
-  // flag, so anything this returned today would be a guess about where the
-  // user's money came from. The day the backend surfaces the flag, this test
-  // is the one that has to change first.
-  it("never claims a receipt is mined, because the wallet cannot know yet", () => {
-    expect(isBlockReward(vt({ amount: 6.25, address: undefined, fee: 0 }))).toBe(false);
+  // The whole point of the flag. Every one of these looks exactly like a
+  // coinbase receipt from the outside, and none of them is one.
+  it("never infers a reward from a missing sender, an absent memo or a zero fee", () => {
+    expect(isBlockReward(vt({ amount: 6.25, address: undefined, fee: 0, memos: undefined }))).toBe(false);
+  });
+
+  it("is false while the wallet does not report the flag at all", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received }))).toBe(false);
+  });
+
+  it("reads the flag zingolib puts in the value-transfer JSON", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received, is_coinbase: true }))).toBe(true);
+  });
+
+  it("reads the mapped name too, so it survives the renderer's own field", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received, isCoinbase: true }))).toBe(true);
+  });
+
+  it("treats an explicit false as an ordinary payment", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.received, is_coinbase: false }))).toBe(false);
+  });
+
+  // A reward is money arriving. A flagged send would be the flag misread.
+  it("only ever applies to a receipt", () => {
+    expect(isBlockReward(vt({ type: ValueTransferKindEnum.sent, is_coinbase: true }))).toBe(false);
   });
 });
 
@@ -177,6 +198,22 @@ describe("toActivityRow", () => {
   it("names shielding as shielding", () => {
     expect(toActivityRow(vt({ type: ValueTransferKindEnum.shield }), 0).title).toBe("Shielded funds");
   });
+
+  it("tags a flagged receipt MINED and names its block", () => {
+    const row = toActivityRow(vt({ type: ValueTransferKindEnum.received, is_coinbase: true, blockheight: 12041 }), 0);
+    expect(row.title).toBe("Block reward");
+    expect(row.state).toBe("MINED");
+    expect(row.mined).toBe(true);
+    expect(row.subtitle).toBe("block #12041");
+  });
+
+  // Maturity is a confirmation count, not this flag. An unconfirmed reward is
+  // still pending, and saying MINED over it would imply it could be spent.
+  it("leaves an unconfirmed reward pending rather than mined", () => {
+    expect(
+      toActivityRow(vt({ type: ValueTransferKindEnum.received, is_coinbase: true, confirmations: 0 }), 0).state,
+    ).toBe("PENDING");
+  });
 });
 
 describe("filterActivity", () => {
@@ -199,6 +236,12 @@ describe("filterActivity", () => {
   // transfer, so here it is a filter over the one list.
   it("finds the transfers that carry a memo", () => {
     expect(filterActivity(rows, "memos")).toHaveLength(1);
+  });
+
+  it("lists mined rewards only when the wallet flagged them", () => {
+    expect(filterActivity(rows, "mined")).toHaveLength(0);
+    const withReward = toActivityRows([vt({ type: ValueTransferKindEnum.received, is_coinbase: true })]);
+    expect(filterActivity(withReward, "mined")).toHaveLength(1);
   });
 });
 

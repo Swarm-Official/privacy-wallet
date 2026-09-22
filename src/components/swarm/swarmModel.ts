@@ -116,8 +116,10 @@ export type SwarmActivityRow = {
   /** Sign only, so a list can colour incoming and outgoing differently. */
   direction: "in" | "out" | "self";
   visibility: SwarmVisibility;
-  /** The badge text: SHIELDED / REVEALED / PENDING / FAILED. */
+  /** The badge text: SHIELDED / REVEALED / MINED / PENDING / FAILED. */
   state: string;
+  /** Whether the wallet flagged this receipt as a mined block reward. */
+  mined: boolean;
   time: number;
   memos: string[];
   address?: string;
@@ -161,23 +163,40 @@ export function visibilityOf(vt: ValueTransferClass): SwarmVisibility {
 }
 
 /**
+ * A value transfer that may carry the coinbase flag.
+ *
+ * `is_coinbase` is what zingolib puts in the value-transfer JSON; `isCoinbase`
+ * is what the renderer's mapper will call it once it carries the field
+ * through. Both are read, and both are optional, because the flag is not in
+ * the SDK this build is pinned at.
+ */
+type MaybeCoinbase = { isCoinbase?: boolean; is_coinbase?: boolean };
+
+/**
  * Whether this receipt is a mined block reward.
  *
- * Always false today, and deliberately so. A coinbase receipt reaches the
- * renderer as an ordinary `received` value transfer: zingolib's value-transfer
- * JSON carries no coinbase flag, and every other field it does carry —
- * no sender, no memo, a zero fee — is equally true of a plain payment from
- * someone who wrote no memo. Labelling one of those "Block reward" would be
- * the wallet telling the user where their money came from on the strength of
- * a guess.
+ * Only ever the wallet's own flag, never an inference. A coinbase receipt
+ * looks exactly like a plain payment from someone who wrote no memo — no
+ * sender, no memo, a zero fee — so reading those as "mined" would be the
+ * wallet telling the user where their money came from on the strength of a
+ * guess. zingolib knows, because it already reads `transparent_bundle()
+ * .is_coinbase()` to enforce coinbase maturity, and it now says so in the
+ * JSON.
  *
- * The function exists so the moment the backend surfaces the flag, one line
- * here turns the MINED state on across every screen. Surfacing it means a
- * change to the native module or the value-transfer contract, which this
- * change is not allowed to make.
+ * False for every transfer in the build this is written against: the flag
+ * lands with the SDK re-pin, and until then the field is simply absent. That
+ * is why it is read defensively rather than assumed — an absent field is
+ * "not a reward", not "unknown".
+ *
+ * MINED is not the same as spendable. A coinbase output is transparent and
+ * subject to the 100-block maturity rule, so a fresh reward is flagged here
+ * while still unspendable; that state comes from the confirmation count, not
+ * from this flag.
  */
-export function isBlockReward(_vt: ValueTransferClass): boolean {
-  return false;
+export function isBlockReward(vt: ValueTransferClass): boolean {
+  if (vt.type !== ValueTransferKindEnum.received) return false;
+  const flagged = vt as ValueTransferClass & MaybeCoinbase;
+  return flagged.isCoinbase === true || flagged.is_coinbase === true;
 }
 
 function abbreviate(address: string | undefined, chars = 8): string {
@@ -212,17 +231,19 @@ function titleFor(vt: ValueTransferClass): { title: string; direction: "in" | "o
 function stateFor(vt: ValueTransferClass, visibility: SwarmVisibility): string {
   if (vt.status === ValueTransferStatusEnum.failed) return "FAILED";
   if (vt.confirmations === 0) return "PENDING";
+  if (isBlockReward(vt)) return "MINED";
   return visibility === "revealed" ? "REVEALED" : "SHIELDED";
 }
 
 export function toActivityRow(vt: ValueTransferClass, index: number): SwarmActivityRow {
   const visibility = visibilityOf(vt);
+  const mined = isBlockReward(vt);
   const { title, direction } = titleFor(vt);
   const sign = direction === "in" ? "+" : direction === "out" ? "−" : "";
   const memos = (vt.memos ?? []).filter((m) => !!m && m.trim().length > 0);
 
   let subtitle: string;
-  if (isBlockReward(vt)) {
+  if (mined) {
     subtitle = `block #${vt.blockheight}`;
   } else if (vt.address) {
     subtitle = `${direction === "in" ? "from" : "to"} ${abbreviate(vt.address)}`;
@@ -245,6 +266,7 @@ export function toActivityRow(vt: ValueTransferClass, index: number): SwarmActiv
     amount: `${sign}${formatSwm(Math.abs(vt.amount ?? 0))}`,
     direction,
     visibility,
+    mined,
     state: stateFor(vt, visibility),
     time: vt.time,
     memos,
@@ -258,7 +280,7 @@ export function toActivityRows(vts: ValueTransferClass[]): SwarmActivityRow[] {
 }
 
 /** The filters the Activity screen offers, and what each one keeps. */
-export type ActivityFilterKey = "all" | "shielded" | "revealed" | "memos";
+export type ActivityFilterKey = "all" | "shielded" | "revealed" | "memos" | "mined";
 
 export function filterActivity(rows: SwarmActivityRow[], filter: ActivityFilterKey): SwarmActivityRow[] {
   switch (filter) {
@@ -268,6 +290,8 @@ export function filterActivity(rows: SwarmActivityRow[], filter: ActivityFilterK
       return rows.filter((r) => r.visibility === "revealed");
     case "memos":
       return rows.filter((r) => r.memos.length > 0);
+    case "mined":
+      return rows.filter((r) => r.mined);
     default:
       return rows;
   }

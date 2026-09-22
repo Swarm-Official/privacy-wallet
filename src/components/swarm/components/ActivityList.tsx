@@ -8,7 +8,7 @@ const STATE_CLASS: Record<string, string> = {
   REVEALED: styles.stateRevealed,
   PENDING: styles.statePending,
   FAILED: styles.stateFailed,
-  MINED: styles.statePending,
+  MINED: styles.stateMined,
 };
 
 function whenLabel(time: number): string {
@@ -27,13 +27,15 @@ type ActivityListProps = {
   hidden: boolean;
   emptyText: string;
   onSelect?: (row: SwarmActivityRow) => void;
+  /** The row the detail panel is showing, if any. */
+  selectedKey?: string | null;
 };
 
 /**
  * The shared list of transfers, used by Overview's recent five and by the
  * Activity screen's full history, so a payment reads the same in both.
  */
-export const ActivityList: React.FC<ActivityListProps> = ({ rows, hidden, emptyText, onSelect }) => {
+export const ActivityList: React.FC<ActivityListProps> = ({ rows, hidden, emptyText, onSelect, selectedKey }) => {
   if (rows.length === 0) {
     return <div className={styles.empty}>{emptyText}</div>;
   }
@@ -44,9 +46,10 @@ export const ActivityList: React.FC<ActivityListProps> = ({ rows, hidden, emptyT
         <li key={row.key}>
           <button
             type="button"
-            className={styles.rowItem}
+            className={`${styles.rowItem} ${row.key === selectedKey ? styles.rowItemSelected : ""}`}
             onClick={onSelect ? () => onSelect(row) : undefined}
             style={onSelect ? undefined : { cursor: "default" }}
+            aria-current={row.key === selectedKey ? "true" : undefined}
           >
             <span
               className={`${styles.rowIcon} ${

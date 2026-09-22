@@ -963,3 +963,299 @@ details[open] > .detailsSummary::before {
     transition: none !important;
   }
 }
+
+/* ------------------------------------------------------------ send/two-up --- */
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+  align-items: start;
+  min-height: 0;
+}
+
+.sideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.fromBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: var(--swarm-surface-raised);
+}
+
+.fromMark {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-s);
+  background: rgba(255, 138, 31, 0.15);
+  border: 1px solid var(--swarm-orange-edge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--swarm-orange);
+}
+
+.inputRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.inputRow .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.fieldWarn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--swarm-clear-blue);
+  margin-top: 7px;
+}
+
+.amountInputLarge {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.maxButton {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 176, 32, 0.4);
+  background: rgba(255, 176, 32, 0.1);
+  color: var(--swarm-honey-light);
+  cursor: pointer;
+  flex: none;
+}
+
+.maxButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chainCard {
+  border-color: var(--swarm-orange-edge);
+  background: linear-gradient(160deg, rgba(255, 138, 31, 0.12), #15110d 60%);
+}
+
+.chainCardRevealed {
+  border-color: var(--swarm-clear-blue-edge);
+  background: linear-gradient(160deg, rgba(111, 182, 255, 0.12), #0f1319 60%);
+}
+
+.chainKicker,
+.chainKickerRevealed {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+}
+
+.chainKicker {
+  color: var(--swarm-orange);
+}
+
+.chainKickerRevealed {
+  color: var(--swarm-clear-blue);
+}
+
+.factList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.factRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--swarm-text-muted);
+}
+
+.factRow > span:last-child {
+  font-family: var(--font-mono);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.factHidden {
+  color: var(--swarm-honey-light);
+  letter-spacing: 0.06em;
+}
+
+.factVisible {
+  color: var(--swarm-text-soft);
+}
+
+.factTotal {
+  padding-top: 9px;
+  border-top: 1px solid var(--swarm-hairline);
+  font-weight: 600;
+  color: var(--swarm-text);
+}
+
+.factTotal > span:last-child {
+  color: var(--swarm-honey-light);
+}
+
+/* ------------------------------------------------------- receive/activity --- */
+
+.qrFrame {
+  align-self: center;
+  padding: 12px;
+  border-radius: var(--radius-xl);
+  background: var(--swarm-text);
+  line-height: 0;
+}
+
+.addressBlock {
+  padding: 11px 13px;
+  border-radius: var(--radius-m);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--swarm-hairline);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--swarm-honey-light);
+  word-break: break-all;
+}
+
+.addressInline {
+  font-size: 11.5px;
+  color: var(--swarm-text-muted);
+  word-break: break-all;
+}
+
+.memoBlock {
+  padding: 11px 13px;
+  border-radius: var(--radius-m);
+  background: var(--swarm-surface-raised);
+  border: 1px solid var(--swarm-hairline);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--swarm-text-soft);
+  overflow-wrap: anywhere;
+}
+
+.guidance {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--swarm-text-muted);
+}
+
+.guidanceRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.guidanceRow strong {
+  color: var(--swarm-text);
+  font-weight: 600;
+}
+
+.guidanceMark {
+  flex: none;
+  margin-top: 2px;
+  color: var(--swarm-orange);
+  display: flex;
+}
+
+.pendingDot {
+  width: 8px;
+  height: 8px;
+  background: var(--swarm-honey);
+  box-shadow: 0 0 8px var(--swarm-honey);
+  animation: swarmPulse 1.5s infinite;
+  flex: none;
+}
+
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: none;
+}
+
+.chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--swarm-hairline-strong);
+  background: transparent;
+  color: var(--swarm-text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--swarm-text-soft);
+}
+
+.chipActive {
+  border-color: var(--swarm-orange);
+  background: var(--swarm-orange-wash);
+  color: var(--swarm-text);
+}
+
+.searchWrap {
+  position: relative;
+  margin-left: auto;
+  min-width: 240px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--swarm-text-dim);
+  display: flex;
+  pointer-events: none;
+}
+
+.searchInput {
+  padding-left: 34px;
+  border-radius: 999px;
+}
+
+.activityGrid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 300px;
+}
+
+.rowItemSelected {
+  background: var(--swarm-orange-wash);
+}
+
+.rowItemSelected:hover {
+  background: var(--swarm-orange-wash);
+}
+
+.stateMined {
+  color: var(--swarm-honey);
+}

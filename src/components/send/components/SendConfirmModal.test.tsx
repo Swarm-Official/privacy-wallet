@@ -331,9 +331,12 @@ describe("SendConfirmModal", () => {
           receivers_available: ["orchard"],
         }),
       );
-      render(<SendConfirmModal {...makeProps({ toaddr: { amount: 100 }, balance: { confirmedOrchardBalance: 1 } })} />, {
-        contextOverrides: { currentWallet: mainnetWallet },
-      });
+      render(
+        <SendConfirmModal {...makeProps({ toaddr: { amount: 100 }, balance: { confirmedOrchardBalance: 1 } })} />,
+        {
+          contextOverrides: { currentWallet: mainnetWallet },
+        },
+      );
 
       expect(await screen.findByRole("button", { name: "Send" })).toBeInTheDocument();
       expect(screen.queryByText(/will not be fully shielded/i)).toBeNull();

@@ -43,7 +43,7 @@ export const MOCK_UNIFIED =
   "utest1vjdkw7r3h2mq9m0y8xg0n6w4c2eqk5t8v7lz3h9n4p2r6s0t5v9x3z7b1d5f9h3k7m1q5w9y2a6c0e4g8j2l6n0p4r8t2v6x0z4";
 export const MOCK_TRANSPARENT = "tmQ8xR4vK2mE7zD6yP3aH5wR9tCL2nFs0X";
 
-function vt(partial: Partial<ValueTransferClass>): ValueTransferClass {
+function vt(partial: Partial<ValueTransferClass> & { is_coinbase?: boolean }): ValueTransferClass {
   return {
     type: ValueTransferKindEnum.received,
     confirmations: 12,
@@ -75,7 +75,12 @@ export const MOCK_VALUE_TRANSFERS: ValueTransferClass[] = [
     blockheight: 12041,
     poolsReceived: [ValueTransferPoolEnum.transparent],
     txid: "a1b2c3d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7082",
-  }),
+    // The flag zingolib sets on a coinbase transaction. Absent from every
+    // other row here, exactly as it is absent from the SDK this build is
+    // pinned at — so the harness shows both what today looks like and what
+    // the tag will look like once the re-pin lands.
+    is_coinbase: true,
+  } as Partial<ValueTransferClass>),
   vt({
     type: ValueTransferKindEnum.sent,
     amount: 250,

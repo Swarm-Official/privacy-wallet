@@ -5,8 +5,7 @@ import { ErrorModal } from "../components/errorModal";
 import cstyles from "../components/common/Common.module.css";
 import routes from "../constants/routes.json";
 import { Insight } from "../components/insight";
-import { Send, SendManyJsonType } from "../components/send";
-import { Receive } from "../components/receive";
+import { SendManyJsonType } from "../components/send";
 import { LoadingScreen } from "../components/loadingScreen";
 import {
   AppState,
@@ -34,7 +33,6 @@ import selectFastestServer from "../utils/selectFastestServer";
 import { AddNewWallet } from "../components/addNewWallet";
 import { AddressBook, AddressbookImpl } from "../components/addressBook";
 import { Sidebar } from "../components/sideBar";
-import { History } from "../components/history";
 import { Swap } from "../components/swap";
 import type { SwapDirectionEnum } from "../swap/enums/SwapDirectionEnum";
 import { ContextAppProvider, defaultAppState } from "../context/ContextAppState";
@@ -42,7 +40,6 @@ import { SwapServiceProvider } from "../context/ContextSwapService";
 
 import { native } from "../electronBridge";
 import { userFacingError } from "../utils/userFacingError";
-import { Messages } from "../components/messages";
 import { OrchardMigration } from "../components/orchardMigration";
 import { RPCIronwoodDrainType } from "../rpc/components/RPCIronwoodDrainType";
 import { MixnetView, deriveMixnetView } from "../rpc/components/mixnetPresenter";
@@ -57,6 +54,9 @@ import { SwarmShell } from "../components/swarm/SwarmShell";
 import { SwarmUiProvider } from "../components/swarm/SwarmUiContext";
 import { OverviewScreen } from "../components/swarm/screens/OverviewScreen";
 import { SettingsScreen } from "../components/swarm/screens/SettingsScreen";
+import { SendScreen } from "../components/swarm/screens/SendScreen";
+import { ReceiveScreen } from "../components/swarm/screens/ReceiveScreen";
+import { ActivityScreen } from "../components/swarm/screens/ActivityScreen";
 
 const { ipcRenderer } = window.electronAPI;
 
@@ -379,10 +379,6 @@ const AppRoutes: React.FC = () => {
   // --- navigation ---
   const navigateToDashboard = useCallback(() => {
     navigate(routes.DASHBOARD, { replace: true, state: {} });
-  }, [navigate]);
-
-  const navigateToHistory = useCallback(() => {
-    navigate(routes.HISTORY, { replace: true, state: {} });
   }, [navigate]);
 
   const navigateToLoadingScreen = useCallback(() => {
@@ -867,15 +863,9 @@ const AppRoutes: React.FC = () => {
                 <Route path={routes.SETTINGS} element={<SettingsScreen />} />
                 <Route
                   path={routes.SEND}
-                  element={
-                    <Send
-                      sendTransaction={runRPCSendTransaction}
-                      setSendPageState={setSendPageState}
-                      addAddressBookEntry={addAddressBookEntry}
-                    />
-                  }
+                  element={<SendScreen sendTransaction={runRPCSendTransaction} setSendPageState={setSendPageState} />}
                 />
-                <Route path={routes.RECEIVE} element={<Receive />} />
+                <Route path={routes.RECEIVE} element={<ReceiveScreen />} />
                 <Route
                   path={routes.ADDRESSBOOK}
                   element={
@@ -886,12 +876,15 @@ const AppRoutes: React.FC = () => {
                   }
                 />
                 <Route path={routes.INSIGHT} element={<Insight />} />
-                <Route path={routes.HISTORY} element={<History />} />
+                <Route path={routes.HISTORY} element={<ActivityScreen />} />
                 <Route
                   path={routes.SWAP}
                   element={<Swap sendSwapDeposit={runRPCSendSwapDeposit} addAddressBookEntry={addAddressBookEntry} />}
                 />
-                <Route path={routes.MESSAGES} element={<Messages />} />
+                {/* Memos are a filter inside Activity now, not a screen of their own:
+                    a memo is a property of a payment. The route stays so a menu item
+                    or a saved link still lands somewhere sensible. */}
+                <Route path={routes.MESSAGES} element={<ActivityScreen />} />
                 <Route path={routes.MIGRATION} element={<OrchardMigration drainToIronwood={runRPCDrainToIronwood} />} />
               </Routes>
             </SwarmShell>
