@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: brs-holding/privacy-zingolib
-          ref: 8507eac5caf1e0e7abe739dcbfb4bf2501f7ff0f
+          ref: dc444848582ae63c4bf9e7aa67abf2b9f2b9639b
           path: sdk-source
       - uses: actions/setup-node@v4
         with:

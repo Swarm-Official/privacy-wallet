@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/brs-holding/privacy-zingolib",
   "branch": "swarm-testnet-wallet",
-  "commit": "8507eac5caf1e0e7abe739dcbfb4bf2501f7ff0f",
+  "commit": "dc444848582ae63c4bf9e7aa67abf2b9f2b9639b",
   "chainName": "swarm-testnet",
   "genesis": "045993f5c91ea160c7ebda573dd97b0016816bca68d395bfff202779b88e2a28",
   "genesisIsPlaceholder": false,
@@ -20,7 +20,7 @@
   },
   "status": "SwarmTestnet development build against the final genesis, whose block is stamped in the past so the chain can produce block 1 immediately. Unsigned, not a release, and no wallet safety claim.",
   "verified": [
-    "6 focused SDK tests (zingolib, Rust 1.96.0)",
+    "9 focused SDK tests (zingolib, Rust 1.96.0)",
     "1 focused CLI test (clearnet-test-mode)"
   ]
 }
