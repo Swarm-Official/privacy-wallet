@@ -798,7 +798,11 @@ const AppRoutes: React.FC = () => {
         enabled={!!currentWallet && !currentWalletOpenError && location.pathname !== routes.LOADING}
       >
         <div style={{ overflow: "hidden" }}>
-          {location.pathname !== "/" && !location.pathname.toLowerCase().includes("zingo") && (
+          {/* The second half of this condition used to ask whether the path
+              contained "zingo". No route in routes.json does, and none ever
+              did in this fork, so it excluded nothing — dead logic carrying a
+              name the application no longer uses. */}
+          {location.pathname !== "/" && (
             <div className={cstyles.sidebarcontainer}>
               <Sidebar doRescan={runRPCRescan} />
             </div>
@@ -809,7 +813,7 @@ const AppRoutes: React.FC = () => {
                 are in and the server it talks to are true of every screen, and
                 the server line had already been pasted into five of them
                 separately. It hides itself when there is no wallet. */}
-            {location.pathname !== routes.LOADING && !location.pathname.toLowerCase().includes("zingo") && (
+            {location.pathname !== routes.LOADING && (
               <WalletBar navigateToLoadingScreenChangingWallet={navigateToLoadingScreenChangingWallet} />
             )}
             <Routes>
