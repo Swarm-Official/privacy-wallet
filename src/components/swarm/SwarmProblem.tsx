@@ -30,10 +30,11 @@ export const SwarmProblemBar: React.FC<SwarmProblemBarProps> = ({ problem, onRet
       <div className={styles.problemBody}>
         <div className={styles.problemHeadline}>{problem.headline}</div>
         <div className={styles.problemText}>{problem.body}</div>
-        {/* The role is stated rather than left implicit: `details` only
-            maps to `group` in newer ARIA-in-HTML, and a screen reader that
-            has not caught up would announce this as nothing at all. */}
-        <details className={styles.details} role="group" aria-label="Technical details">
+        {/* The label is stated; the role is not. `details` already maps to
+            `group`, so spelling it out is redundant and the linter says so —
+            and an explicit role that matches the implicit one buys nothing on
+            a reader that has it, while not helping one that has not. */}
+        <details className={styles.details} aria-label="Technical details">
           <summary className={styles.detailsSummary}>Technical details</summary>
           <pre className={styles.detailsBody}>{problem.technical}</pre>
         </details>
