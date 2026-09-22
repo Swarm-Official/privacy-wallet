@@ -1,0 +1,156 @@
+name: SWARM wallet Linux and macOS test build
+
+# Its own workflow rather than more jobs on the Windows one, so a Linux or
+# macOS failure never costs the Windows build and either can be re-run alone.
+# Tag-started for the same reason as the Windows build: `workflow_dispatch`
+# only fires for workflows on the default branch, and this one is not there.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "swarm-unix-*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_PROFILE_RELEASE_DEBUG: "0"
+  CARGO_PROFILE_RELEASE_LTO: "false"
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  # No Apple account exists, so nothing may go looking for a signing identity.
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+  RUSTUP_TOOLCHAIN: "1.96.0"
+  RUSTFLAGS: '--cfg zcash_unstable="nu6.3"'
+  SWARM_SDK_REV: "dc444848582ae63c4bf9e7aa67abf2b9f2b9639b"
+
+jobs:
+  unix-wallet:
+    strategy:
+      # One platform failing must not cancel the other: a macOS toolchain
+      # problem should still leave a Linux package to ship.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-22.04
+            arch: x64
+            # 22.04 rather than latest: the glibc a binary is built against is
+            # the oldest it will run on, so building on the older image is what
+            # lets the AppImage work on both 22.04 and 24.04.
+            electron_flags: "--linux AppImage deb --x64"
+          - platform: mac-arm64
+            runner: macos-14
+            arch: arm64
+            electron_flags: "--mac dmg zip --arm64"
+          - platform: mac-x64
+            runner: macos-13
+            arch: x64
+            electron_flags: "--mac dmg zip --x64"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the pinned SDK revision
+        uses: actions/checkout@v4
+        with:
+          repository: Swarm-Official/privacy-zingolib
+          ref: dc444848582ae63c4bf9e7aa67abf2b9f2b9639b
+          path: sdk-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: yarn
+      - name: Restore compiled Rust outputs
+        id: rust-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/target
+          key: swarm-${{ matrix.platform }}-rust196-nu63-${{ hashFiles('native/Cargo.lock', 'native/src/lib.rs', 'sdk/swarm-sdk-pin.json') }}
+          restore-keys: swarm-${{ matrix.platform }}-rust196-nu63-
+      - name: Install build prerequisites
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          npm install --global yarn@1.22.22
+      - name: Install protoc (Linux)
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install protoc (macOS)
+        if: startsWith(matrix.platform, 'mac')
+        run: brew install protobuf
+      - name: Install locked JavaScript dependencies
+        run: yarn install --frozen-lockfile
+      - name: Validate the complete packaging configuration
+        run: node scripts/check-swarm-package-config.js
+      # Everything cheap that can refuse the build runs before the hour of
+      # compilation, not after it.
+      - name: Verify the pinned SDK revision and its network
+        run: node scripts/check-swarm-sdk-pin.js sdk-source --require-real-genesis
+      - name: Check the lockfile resolves without changes
+        run: cargo fetch --locked --manifest-path native/Cargo.toml
+      - name: Generate the empty optional swap configuration
+        run: node scripts/generate-swapkit-secrets.js
+      - name: Check the frontend types
+        run: yarn tsc --noEmit
+      - name: Verify network, endpoint and server-selection boundaries
+        run: node scripts/test.js --watchAll=false --runInBand src/utils/fetchServerList.test.ts src/utils/utils.test.ts src/components/addNewWallet/AddNewWallet.test.tsx src/components/dashboard/Dashboard.test.tsx src/components/send/Send.test.tsx src/components/walletBar/SelectWallet.test.tsx
+      - name: Build the pinned wallet SDK adapter
+        run: yarn ${{ matrix.platform == 'linux' && 'neon' || (matrix.arch == 'arm64' && 'neon-mac-arm64' || 'neon-mac-x64') }}
+      - name: Check Rust dependency pins
+        run: git diff --exit-code -- native/Cargo.lock
+      - name: Build the matching upstream transport helper
+        run: node scripts/stage-nym-proxy.js --strict-rev --target ${{ matrix.platform == 'linux' && 'x86_64-unknown-linux-gnu' || (matrix.arch == 'arm64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin') }}
+      - name: Save successful Rust outputs before packaging
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/target
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}
+      - name: Build the desktop frontend
+        run: yarn script:build
+        env:
+          CI: ""
+      - name: Check the renderer shows no upstream naming
+        run: node scripts/check-swarm-bundle-strings.js --renderer build/static/js
+      - name: Package the unsigned test wallet
+        run: yarn electron-builder ${{ matrix.electron_flags }} --config configs/swarm-testnet-builder.cjs --publish never
+      - name: Check the packaged application shows no upstream naming
+        run: node scripts/check-swarm-bundle-strings.js --asar dist --renderer build/static/js
+      # A package nobody has started is a guess. These do not go past the
+      # unlock screen and create no wallet; they answer one question only —
+      # does the thing we are about to publish run at all on this platform.
+      - name: Smoke-test the AppImage under a virtual display
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get install -y xvfb libfuse2
+          node scripts/swarm-smoke.js linux
+      - name: Smoke-test the packaged application
+        if: startsWith(matrix.platform, 'mac')
+        run: node scripts/swarm-smoke.js mac
+      - name: Record build provenance and checksums
+        run: |
+          git rev-parse HEAD > dist/source-commit.txt
+          cp native/Cargo.lock dist/Cargo.lock
+          cp sdk-integration.json dist/sdk-integration.json
+          cd dist && shasum -a 256 *.AppImage *.deb *.dmg *.zip > SHA256SUMS 2>/dev/null || true
+          cat dist/SHA256SUMS 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swarm-wallet-${{ matrix.platform }}-unsigned-testnet
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.dmg
+            dist/*.zip
+            dist/SHA256SUMS
+            dist/source-commit.txt
+            dist/Cargo.lock
+            dist/sdk-integration.json
+          retention-days: 14

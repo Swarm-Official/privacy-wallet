@@ -66,9 +66,14 @@ const SWARM_CHAIN_NAME = "swarm-testnet";
 // The project's official channels, and the only destinations this application
 // offers to open. Upstream's were ZingoLabs'; a user following a link out of
 // this wallet must not end up somewhere that has never heard of this network.
+// The polkit action the .deb registers on Linux; see
+// resources/swarm/linux/green.swarm.wallet.policy. Its own id, not
+// upstream's, so a machine with both wallets does not have one answering
+// for the other.
+const SWARM_POLKIT_ACTION = "green.swarm.wallet.authenticate";
 const SWARM_SITE_URL = "https://swarm.green";
-const SWARM_SOURCE_URL = "https://github.com/brs-holding";
-const SWARM_ISSUES_URL = "https://github.com/brs-holding/privacy-wallet/issues";
+const SWARM_SOURCE_URL = "https://github.com/Swarm-Official";
+const SWARM_ISSUES_URL = "https://github.com/Swarm-Official/privacy-wallet/issues";
 const SWARM_DEFAULT_SERVER = "https://lwd.swarm.green:443";
 
 if (isSwarmWalletBuild && !settings.getSync("all")) {
@@ -735,8 +740,8 @@ ipcMain.handle("auth:check", async () => {
           const { execFile } = require("child_process");
           // polkit 0.105 (Linux Mint / Ubuntu) exits with code 1 even when the
           // action exists, so check stdout instead of the exit code.
-          execFile("pkaction", ["--action-id", "co.zingo.pc.authenticate"], (_err, stdout) => {
-            resolve(stdout && stdout.includes("co.zingo.pc.authenticate") ? "available" : "not_installed_linux");
+          execFile("pkaction", ["--action-id", SWARM_POLKIT_ACTION], (_err, stdout) => {
+            resolve(stdout && stdout.includes(SWARM_POLKIT_ACTION) ? "available" : "not_installed_linux");
           });
         }),
       "not_installed_linux",
@@ -798,15 +803,15 @@ ipcMain.handle("auth:verify", async (_e, reason) => {
       // Probe the polkit action first; if it's not registered (dev mode,
       // AppImage, missing .deb post-install) skip verification rather than
       // failing the entire send flow.
-      execFile("pkaction", ["--action-id", "co.zingo.pc.authenticate"], (_err, stdout) => {
-        const available = stdout && stdout.includes("co.zingo.pc.authenticate");
+      execFile("pkaction", ["--action-id", SWARM_POLKIT_ACTION], (_err, stdout) => {
+        const available = stdout && stdout.includes(SWARM_POLKIT_ACTION);
         if (!available) {
           resolve({ success: true });
           return;
         }
         execFile(
           "pkcheck",
-          ["--action-id", "co.zingo.pc.authenticate", "--process", String(process.pid), "--allow-user-interaction"],
+          ["--action-id", SWARM_POLKIT_ACTION, "--process", String(process.pid), "--allow-user-interaction"],
           (err) => resolve({ success: !err }),
         );
       });

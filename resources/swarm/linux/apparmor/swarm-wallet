@@ -1,0 +1,27 @@
+# AppArmor profile for SWARM Wallet (Testnet).
+#
+# Required on Ubuntu 24.04+ / Debian 13+, where unprivileged user namespaces
+# are restricted by default (kernel.apparmor_restrict_unprivileged_userns=1).
+# Without a profile granting `userns`, Chromium's zygote fails to start and
+# the app dies immediately on launch with:
+#   FATAL:zygote_host_impl_linux.cc:207 Check failed: . : Invalid argument (22)
+#
+# flags=(unconfined) — this does not sandbox the application, it only opts in
+# to the new userns permission model. The same pattern VSCode, Brave and other
+# Electron applications ship for 24.04+.
+#
+# The `abi <abi/4.0>,` line makes older parsers (Ubuntu 22.04 and earlier)
+# skip the profile cleanly instead of erroring.
+#
+# The path must match where the .deb installs the binary, which is
+# /opt/<productName>/<executableName>. Upstream's profile names
+# "/opt/Zingo PC/zingo-pc"; ours is renamed, so a copy of that file would
+# match nothing and the crash it exists to prevent would come back.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile swarm-wallet "/opt/SWARM Wallet (Testnet)/SWARM Wallet Testnet" flags=(unconfined) {
+  userns,
+  include if exists <local/swarm-wallet>
+}

@@ -19,12 +19,15 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-const SIZE = 256;
 const SUPERSAMPLE = 4;
-const CANVAS = SIZE * SUPERSAMPLE;
+
+// Filled in per render by `renderPng`; the drawing below reads them the way
+// it always did, so the shapes needed no rewriting to gain more sizes.
+let SIZE = 256;
+let CANVAS = SIZE * SUPERSAMPLE;
 // The source artwork is drawn on a 64x64 viewBox.
 const VIEWBOX = 64;
-const SCALE = CANVAS / VIEWBOX;
+let SCALE = CANVAS / VIEWBOX;
 
 const HIVE_ORANGE = [0xff, 0x8a, 0x1f];
 const HONEY = [0xff, 0xb0, 0x20];
@@ -115,6 +118,12 @@ const bounds = (points) => ({
   maxY: Math.min(CANVAS - 1, Math.ceil(Math.max(...points.map((p) => p[1])) * SCALE)),
 });
 
+/** The mark as a PNG of `size` pixels square. */
+function renderPng(size) {
+  SIZE = size;
+  CANVAS = SIZE * SUPERSAMPLE;
+  SCALE = CANVAS / VIEWBOX;
+
 const canvas = Buffer.alloc(CANVAS * CANVAS * 4);
 
 for (const shape of SHAPES) {
@@ -202,6 +211,10 @@ const png = Buffer.concat([
   chunk("IDAT", zlib.deflateSync(raw, { level: 9 })),
   chunk("IEND", Buffer.alloc(0)),
 ]);
+  return png;
+}
+
+const png = renderPng(256);
 
 // A Vista-era .ico: one 256x256 entry holding the PNG as-is. 0 in the width
 // and height bytes means 256, which is the only value they cannot hold.
@@ -219,12 +232,24 @@ ico.writeUInt32LE(png.length, 14);
 ico.writeUInt32LE(22, 18);
 
 const directory = path.resolve(__dirname, "../resources/swarm");
-fs.mkdirSync(directory, { recursive: true });
+const linuxIcons = path.join(directory, "icons");
+fs.mkdirSync(linuxIcons, { recursive: true });
 fs.writeFileSync(path.join(directory, "icon.png"), png);
 fs.writeFileSync(path.join(directory, "icon.ico"), Buffer.concat([ico, png]));
 // The same mark inside the application, beside the version string.
 fs.writeFileSync(path.resolve(__dirname, "../src/assets/img/swarm-mark.png"), png);
+
+// Linux takes a directory of PNGs named by size; electron-builder picks
+// what each target needs. macOS takes the 1024 and converts it to an icns
+// on the runner, which is the only place the conversion tooling exists.
+const sizes = [16, 32, 48, 64, 128, 256, 512, 1024];
+for (const size of sizes) {
+  fs.writeFileSync(path.join(linuxIcons, `${size}x${size}.png`), renderPng(size));
+}
+fs.copyFileSync(path.join(linuxIcons, "1024x1024.png"), path.join(directory, "icon-1024.png"));
+
 console.log(
-  `Wrote the SWARM hive-bee mark (${SIZE}x${SIZE}) to resources/swarm/icon.png, ` +
-    "resources/swarm/icon.ico and src/assets/img/swarm-mark.png.",
+  `Wrote the SWARM hive-bee mark to resources/swarm: icon.png and icon.ico (256), ` +
+    `icon-1024.png for macOS, icons/ at ${sizes.join(', ')} for Linux, ` +
+    `and src/assets/img/swarm-mark.png.`,
 );

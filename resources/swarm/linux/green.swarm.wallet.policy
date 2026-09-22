@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+  "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  The polkit action behind "unlock this wallet" on Linux.
+
+  Its own action id rather than upstream's `co.zingo.pc.authenticate`: the
+  description and message below are shown to the user in the authentication
+  dialog, so they have to name this application, and a machine with both
+  wallets installed must not have one silently answering for the other.
+
+  Installed by the .deb's postinstall. An AppImage cannot install it, so
+  there the probe finds nothing and the wallet skips device authentication
+  rather than presenting a button that does nothing.
+-->
+<policyconfig>
+  <vendor>SWARM</vendor>
+  <vendor_url>https://swarm.green</vendor_url>
+  <action id="green.swarm.wallet.authenticate">
+    <description>Authenticate to open SWARM Wallet</description>
+    <message>Authentication is required to open your SWARM Wallet</message>
+    <defaults>
+      <allow_any>auth_self</allow_any>
+      <allow_inactive>auth_self</allow_inactive>
+      <allow_active>auth_self</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

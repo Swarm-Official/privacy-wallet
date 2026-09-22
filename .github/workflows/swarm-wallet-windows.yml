@@ -37,7 +37,7 @@ jobs:
       - name: Check out the pinned SDK revision
         uses: actions/checkout@v4
         with:
-          repository: brs-holding/privacy-zingolib
+          repository: Swarm-Official/privacy-zingolib
           ref: dc444848582ae63c4bf9e7aa67abf2b9f2b9639b
           path: sdk-source
       - uses: actions/setup-node@v4
