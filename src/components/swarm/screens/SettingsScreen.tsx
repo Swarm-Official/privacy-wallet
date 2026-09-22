@@ -236,15 +236,21 @@ export const SettingsScreen: React.FC = () => {
             </div>
           </div>
           {/*
-            The attribution the licence requires, and the only place upstream's
-            name appears in this application. It is not a defect and the bundle
-            check allows this sentence by name: the MIT licence requires the
-            copyright notice to travel with the code, and saying what this is
-            built on is the honest thing to do besides.
+            The attribution the licence requires. Word for word the sentence
+            the About box already uses, and word for word what
+            scripts/check-swarm-bundle-strings.js allows by name — not because
+            the check is in the way, but because two different wordings of the
+            same attribution is how one of them quietly drifts into being
+            wrong. The MIT licence requires the copyright notice to travel
+            with the code, and saying what this is built on is the honest
+            thing to do besides.
           */}
           <div className={styles.licence}>
-            Based on Zingo PC {UPSTREAM_VERSION} by ZingoLabs (MIT). SWARM Wallet is an independent fork and is not
-            endorsed by ZingoLabs.
+            Based on Zingo PC {UPSTREAM_VERSION} by ZingoLabs, under the MIT licence below.
+            <br />
+            The MIT License (MIT) Copyright (c) 2026 ZingoLabs
+            <br />
+            The full notice is in the application menu, under About.
           </div>
           <button type="button" className={styles.panelLink} onClick={() => navigate(routes.DASHBOARD)}>
             Back to Overview →
