@@ -118,6 +118,37 @@
 /* Lock and sign out. They act on the session rather than on a wallet, so they
    sit together in the rail — visible from every screen, which is the whole
    point: the owner's report was that there was no sign-out button anywhere. */
+/* The base button is defined HERE, before the first `composes` that needs it.
+   css-loader only composes classes that appear EARLIER in the file, and
+   `.railAction { composes: btn; }` broke the Windows build (run 35860978176:
+   "referenced class name \"btn\" in composes not found") because .btn was
+   declared at the bottom of this file. Moving it up also restores the intent of
+   the rail buttons: with .btn last, its padding and font-size were winning over
+   .railAction's. */
+.btn {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 11px 20px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--swarm-hairline-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--swarm-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .railActions {
   display: flex;
   gap: 8px;
@@ -486,24 +517,9 @@ details[open] > .detailsSummary::before {
 
 /* -------------------------------------------------------------- buttons --- */
 
-.btn {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 13.5px;
-  padding: 11px 20px;
-  border-radius: var(--radius-m);
-  border: 1px solid var(--swarm-hairline-strong);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--swarm-text);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-}
+/* .btn, .btn:hover and .btn:disabled are defined near the top of this file, on
+   purpose: css-loader only composes classes declared earlier, and the rail's
+   `.railAction { composes: btn }` is the first thing that needs it. */
 
 .btnPrimary {
   border-color: var(--swarm-orange);
@@ -515,11 +531,6 @@ details[open] > .detailsSummary::before {
 .btnPrimary:hover:not(:disabled) {
   background: var(--swarm-honey);
   box-shadow: 0 0 36px rgba(255, 138, 31, 0.6);
-}
-
-.btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
 }
 
 .btnSmall {
