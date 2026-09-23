@@ -125,6 +125,17 @@ describe("plainProblem", () => {
     expect(problem?.retryable).toBe(false);
   });
 
+  it("recognises a shard-tree corruption as a local rebuild, not a retry", () => {
+    const problem = plainProblem(
+      "sync: shard tree error ← Inserted root conflicts with existing root at address Address { level: Level(0), index: 1246 }",
+      "lwd.swarm.green",
+    );
+    expect(problem?.kind).toBe("shard-tree");
+    expect(problem?.retryable).toBe(false);
+    expect(problem?.rebuildable).toBe(true);
+    expect(problem?.headline).toContain("corrupted");
+  });
+
   it("falls back to the server's generic name when the host is unknown", () => {
     expect(plainProblem("dns error")?.headline).toContain("the wallet server");
   });

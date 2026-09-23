@@ -74,6 +74,8 @@ type SwarmShellProps = {
   children: ReactNode;
   /** Re-runs the sync the app would have run anyway, now. */
   onRetry: () => void;
+  /** Clears the local sync data and re-syncs from the server (a rebuild). */
+  onRebuild?: () => void;
 };
 
 const STATUS_CLASS = {
@@ -84,7 +86,7 @@ const STATUS_CLASS = {
   disconnected: styles.statusDisconnected,
 } as const;
 
-export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry }) => {
+export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry, onRebuild }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { hidden, toggleHidden } = useContext(SwarmUiContext);
@@ -204,7 +206,7 @@ export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry }) => 
           </div>
         </div>
 
-        <SwarmProblemBar problem={problem} onRetry={onRetry} />
+        <SwarmProblemBar problem={problem} onRetry={onRetry} onRebuild={onRebuild} />
 
         {children}
       </main>

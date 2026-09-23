@@ -8,6 +8,8 @@ type SwarmProblemBarProps = {
   /** Runs the same refresh the app would do on its own, sooner. */
   onRetry?: () => void;
   retrying?: boolean;
+  /** Clears the local sync data and re-syncs from the server (a rebuild). */
+  onRebuild?: () => void;
 };
 
 /**
@@ -19,7 +21,7 @@ type SwarmProblemBarProps = {
  * raw text inside is never edited — a person reporting a bug has to be able to
  * copy exactly what the wallet said.
  */
-export const SwarmProblemBar: React.FC<SwarmProblemBarProps> = ({ problem, onRetry, retrying }) => {
+export const SwarmProblemBar: React.FC<SwarmProblemBarProps> = ({ problem, onRetry, retrying, onRebuild }) => {
   if (!problem) return null;
 
   return (
@@ -43,6 +45,13 @@ export const SwarmProblemBar: React.FC<SwarmProblemBarProps> = ({ problem, onRet
         <div className={styles.problemActions}>
           <button type="button" className={`${styles.btn} ${styles.btnSmall}`} onClick={onRetry} disabled={retrying}>
             {retrying ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      )}
+      {problem.rebuildable && onRebuild && (
+        <div className={styles.problemActions}>
+          <button type="button" className={`${styles.btn} ${styles.btnSmall}`} onClick={onRebuild}>
+            Rebuild
           </button>
         </div>
       )}

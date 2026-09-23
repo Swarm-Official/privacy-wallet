@@ -133,7 +133,7 @@ export function deriveStatus(
   };
 }
 
-export type SwarmProblemKind = "unreachable" | "funds" | "wallet" | "unknown";
+export type SwarmProblemKind = "unreachable" | "funds" | "wallet" | "shard-tree" | "unknown";
 
 export type SwarmProblem = {
   kind: SwarmProblemKind;
@@ -143,6 +143,10 @@ export type SwarmProblem = {
   body: string;
   /** Whether offering a Retry button makes sense for this failure. */
   retryable: boolean;
+  /** Whether the fix is a local rebuild (clear the saved sync data and re-sync
+   *  from the server) rather than a retry or a server switch. Set together with
+   *  `retryable: false` for a corrupted local sync database. */
+  rebuildable?: boolean;
   /** The original text, verbatim, for the "Technical details" expander. */
   technical: string;
 };
@@ -175,6 +179,16 @@ const UNREACHABLE = [
 
 const FUNDS = ["insufficient funds", "insufficient balance", "not enough"];
 
+// The local sync database has a shard-tree invariant violation (a commitment
+// tree root that contradicts the saved store). Retrying or switching servers
+// cannot fix this — it is the wallet's own saved data, not the server's — so
+// the only useful action is to rebuild the local copy against the server.
+const SHARD_TREE = [
+  "shard tree error",
+  "inserted root conflicts",
+  "root conflicts with existing root",
+];
+
 /**
  * A raw failure, turned into something worth reading.
  *
@@ -206,6 +220,17 @@ export function plainProblem(raw: string | undefined | null, host?: string): Swa
       headline: "Not enough spendable balance for this payment.",
       body: "Coins from a very recent block are still confirming and cannot be spent yet.",
       retryable: false,
+      technical,
+    };
+  }
+
+  if (SHARD_TREE.some((needle) => lower.includes(needle))) {
+    return {
+      kind: "shard-tree",
+      headline: "Your wallet's local sync data is corrupted.",
+      body: "Your coins are safe on-chain. This wallet cannot finish syncing from the data it already has, so choose Rebuild to clear the local copy and re-sync from the server — you keep your wallet and its recovery phrase.",
+      retryable: false,
+      rebuildable: true,
       technical,
     };
   }
