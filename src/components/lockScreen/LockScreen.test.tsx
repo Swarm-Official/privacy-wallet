@@ -68,3 +68,80 @@ describe("the unlock screen", () => {
     expect(onUnlock).not.toHaveBeenCalled();
   });
 });
+
+// The code lock, added because the owner reported there was no way to sign out
+// or lock the wallet once it was open. These assert the two halves of that:
+// the code screen asks for a code and the comparison happens in the main
+// process, and signing out is reachable even from a locked wallet, because
+// that is the only way out of a code nobody remembers.
+const LockScreenWithMode = LockScreen as unknown as React.FC<{
+  onUnlock: () => void;
+  mode?: "code" | "device";
+  onSignOut?: () => void;
+}>;
+
+describe("the lock screen with a code", () => {
+  it("asks for the code, and says what the code protects and what it does not", () => {
+    render(<LockScreenWithMode onUnlock={jest.fn()} mode="code" />);
+
+    expect(screen.getByText("Enter your code to use this wallet.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Lock code")).toBeInTheDocument();
+    expect(screen.queryByText(/Device authentication is required/)).toBeNull();
+    expect(screen.getByText(/does not encrypt the wallet file/)).toBeInTheDocument();
+  });
+
+  it("sends the code to the main process, which is the only place it is compared", async () => {
+    invoke.mockResolvedValue({ ok: true });
+    const onUnlock = jest.fn();
+    render(<LockScreenWithMode onUnlock={onUnlock} mode="code" />);
+
+    fireEvent.change(screen.getByLabelText("Lock code"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("lock:verify", "123456"));
+    await waitFor(() => expect(onUnlock).toHaveBeenCalled());
+  });
+
+  it("stays locked, repeats what main said, and clears the field when the code is wrong", async () => {
+    invoke.mockResolvedValue({ ok: false, reason: "Wrong code. 4 tries left." });
+    const onUnlock = jest.fn();
+    render(<LockScreenWithMode onUnlock={onUnlock} mode="code" />);
+
+    fireEvent.change(screen.getByLabelText("Lock code"), { target: { value: "000000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    expect(await screen.findByText("Wrong code. 4 tries left.")).toBeInTheDocument();
+    expect(onUnlock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Lock code")).toHaveValue("");
+  });
+
+  it("does not ask main anything when nothing was typed", async () => {
+    render(<LockScreenWithMode onUnlock={jest.fn()} mode="code" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    expect(await screen.findByText("Enter your code.")).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("offers signing out from the locked screen, which is the way out of a forgotten code", () => {
+    const onSignOut = jest.fn();
+    render(<LockScreenWithMode onUnlock={jest.fn()} mode="code" onSignOut={onSignOut} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the device-authentication path working when no code is set", async () => {
+    invoke.mockResolvedValue({ success: true });
+    const onUnlock = jest.fn();
+    render(<LockScreenWithMode onUnlock={onUnlock} mode="device" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("auth:verify", `Unlock ${SWARM_APP_NAME}`));
+    await waitFor(() => expect(onUnlock).toHaveBeenCalled());
+  });
+});
+

@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { SwarmShell, navForPath } from "./SwarmShell";
+import { SwarmActions, SwarmActionsContext } from "./SwarmActionsContext";
 import { SwarmUiProvider } from "./SwarmUiContext";
 import { ContextAppProvider, defaultAppState } from "../../context/ContextAppState";
 import { AppState, InfoClass, ServerChainNameEnum } from "../appstate";
@@ -136,6 +137,63 @@ describe("SwarmShell", () => {
     await userEvent.click(button);
     expect(screen.getByRole("button", { name: /show balances/i })).toHaveAttribute("aria-pressed", "true");
   });
+
+
+// The owner's report was "the node app & wallet has no sign out button". These
+// are the wallet's two, in the rail, on every screen — and they call the
+// application's handlers rather than doing anything of their own, so what a
+// click does and what the menu item does cannot drift apart.
+describe("the rail's session buttons", () => {
+  const noopActions: SwarmActions = {
+    openSecurity: () => {},
+    openImport: () => {},
+    rescan: () => {},
+    retrySync: () => {},
+    lockNow: () => {},
+    signOut: () => {},
+  };
+
+  function renderRail(overrides: Partial<SwarmActions> = {}) {
+    return render(
+      <SwarmActionsContext.Provider value={{ ...noopActions, ...overrides }}>
+        <ContextAppProvider value={state({})}>
+          <MemoryRouter initialEntries={[routes.DASHBOARD]}>
+            <SwarmUiProvider>
+              <SwarmShell onRetry={jest.fn()}>
+                <div>screen</div>
+              </SwarmShell>
+            </SwarmUiProvider>
+          </MemoryRouter>
+        </ContextAppProvider>
+      </SwarmActionsContext.Provider>,
+    );
+  }
+
+  it("shows a Lock button and a Sign out button", () => {
+    renderRail();
+
+    expect(screen.getByRole("button", { name: "Lock" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("locks the wallet when Lock is pressed", async () => {
+    const lockNow = jest.fn();
+    renderRail({ lockNow });
+
+    await userEvent.click(screen.getByRole("button", { name: "Lock" }));
+
+    expect(lockNow).toHaveBeenCalledTimes(1);
+  });
+
+  it("signs out when Sign out is pressed", async () => {
+    const signOut = jest.fn();
+    renderRail({ signOut });
+
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+});
 
   it("shows this application's own version, from src/version", () => {
     renderShell();

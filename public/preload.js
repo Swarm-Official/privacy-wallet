@@ -101,6 +101,8 @@ const ALLOWED_RECEIVE = new Set([
   "deletewallet",
   "appquitting",
   "appsecurity",
+  "lockwallet",
+  "signout",
   "change-wallet-dir",
   "import-data",
   "mixnet-status",
@@ -126,6 +128,13 @@ const ALLOWED_INVOKE = new Set([
   // Reading a payment QR with the camera, in Send.
   "camera:request-access",
   "auth:verify",
+  // The code lock, and signing out. Main owns the comparison and the waits;
+  // the renderer never sees the stored hash.
+  "lock:status",
+  "lock:set",
+  "lock:clear",
+  "lock:verify",
+  "session:sign-out",
   "wallet-dir:request",
   "fs:existsSync",
   "fs:mkdir",

@@ -41,6 +41,7 @@ const {
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const settings = require("electron-settings");
 const storage = require("electron-json-storage");
 const { createServerRegistry } = require("./serverRegistry");
@@ -275,6 +276,25 @@ class MenuBuilder {
           accelerator: "Ctrl+P",
           click: () => {
             mainWindow.webContents.send("payuri");
+          },
+        },
+        { type: "separator" },
+        // Locking and signing out, where a person looks for them in an
+        // application menu. Both are also buttons in the window itself: the
+        // owner's report was that there was no sign-out button anywhere, and a
+        // menu item alone is not a button.
+        {
+          label: "&Lock Wallet",
+          accelerator: "CmdOrCtrl+L",
+          click: () => {
+            mainWindow.webContents.send("lockwallet");
+          },
+        },
+        {
+          label: "Sign &Out",
+          accelerator: "CmdOrCtrl+Shift+Q",
+          click: () => {
+            mainWindow.webContents.send("signout");
           },
         },
         { type: "separator" },
@@ -856,6 +876,204 @@ async function setRequireAuth(value) {
   }
   _requireAuthCache = value;
 }
+
+// ── The lock code ─────────────────────────────────────────────────────────
+// A code the user sets, which has to be entered to come back into a locked
+// wallet. It locks the session, it does not encrypt the wallet file — the same
+// limit the device-authentication lock has — and the lock screen says so
+// rather than implying more than it can do.
+//
+// Stored where the device-authentication flag is stored: the OS keychain
+// through keytar, with settings.json as the fallback for a Linux install whose
+// libsecret is missing. What is written is a random salt and a scrypt-derived
+// key, so reading the store does not reveal the code, and the code itself is
+// never written, logged or sent anywhere outside this process.
+const LOCK_CODE_ACCOUNT = "lockCode";
+const LOCK_CODE_SETTINGS_KEY = "all.lockCode";
+const LOCK_CODE_MIN_LENGTH = 6;
+const LOCK_CODE_MAX_LENGTH = 12;
+const LOCK_CODE_SALT_BYTES = 16;
+const LOCK_CODE_KEY_BYTES = 32;
+// 2^15 with r=8 is about 32 MB and tens of milliseconds: invisible to a person
+// entering their code, expensive for a script guessing against the stored hash.
+const LOCK_CODE_SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+// Five free tries, then a wait that doubles each try up to a minute. The count
+// lives in this process, so quitting and reopening clears it; that is stated
+// rather than hidden, because the wallet file is not encrypted and a stored
+// counter would suggest a defence this kind of lock does not have.
+const LOCK_CODE_FREE_ATTEMPTS = 5;
+const LOCK_CODE_MAX_WAIT_SECONDS = 60;
+
+let _lockCodeCache; // undefined = not read yet, null = no code is set
+let _lockCodeFailures = 0;
+let _lockCodeBlockedUntil = 0;
+
+function lockCodeWaitSeconds() {
+  const remaining = _lockCodeBlockedUntil - Date.now();
+  return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+}
+
+function deriveLockCode(code, salt, params) {
+  return crypto.scryptSync(code, salt, LOCK_CODE_KEY_BYTES, params);
+}
+
+/** The stored record, or null. A store we cannot read means "no code". */
+async function readLockCode() {
+  if (_lockCodeCache !== undefined) return _lockCodeCache;
+  let raw = null;
+  try {
+    const keytar = require("keytar");
+    raw = await keytar.getPassword(KEYTAR_SERVICE, LOCK_CODE_ACCOUNT);
+  } catch {
+    raw = null;
+  }
+  if (raw === null || raw === undefined) {
+    const fallback = settings.getSync(LOCK_CODE_SETTINGS_KEY);
+    raw = typeof fallback === "string" ? fallback : null;
+  }
+  if (!raw) {
+    _lockCodeCache = null;
+    return null;
+  }
+  try {
+    const record = JSON.parse(raw);
+    if (record && typeof record.salt === "string" && typeof record.hash === "string") {
+      _lockCodeCache = record;
+      return record;
+    }
+  } catch {
+    // Treated as "no code", not as a wallet nobody can open: a code is a
+    // convenience lock, and refusing to start because its record is damaged
+    // would turn a small problem into a dead installation.
+  }
+  _lockCodeCache = null;
+  return null;
+}
+
+async function writeLockCode(record) {
+  const raw = JSON.stringify(record);
+  try {
+    const keytar = require("keytar");
+    await keytar.setPassword(KEYTAR_SERVICE, LOCK_CODE_ACCOUNT, raw);
+    settings.unsetSync(LOCK_CODE_SETTINGS_KEY);
+  } catch {
+    settings.setSync(LOCK_CODE_SETTINGS_KEY, raw);
+  }
+  _lockCodeCache = record;
+}
+
+async function removeLockCode() {
+  try {
+    const keytar = require("keytar");
+    await keytar.deletePassword(KEYTAR_SERVICE, LOCK_CODE_ACCOUNT);
+  } catch {
+    // Nothing stored there; the settings fallback below is the real store then.
+  }
+  settings.unsetSync(LOCK_CODE_SETTINGS_KEY);
+  _lockCodeCache = null;
+}
+
+/** Digits only, and long enough to be worth typing. */
+function lockCodeShape(value) {
+  const code = typeof value === "string" ? value.trim() : "";
+  if (!/^[0-9]+$/.test(code)) return { ok: false, reason: "Use digits only." };
+  if (code.length < LOCK_CODE_MIN_LENGTH) {
+    return { ok: false, reason: `Use at least ${LOCK_CODE_MIN_LENGTH} digits.` };
+  }
+  if (code.length > LOCK_CODE_MAX_LENGTH) {
+    return { ok: false, reason: `Use at most ${LOCK_CODE_MAX_LENGTH} digits.` };
+  }
+  return { ok: true, code };
+}
+
+/**
+ * One code against the stored one. The only place that compares them, so the
+ * lock screen, the settings screen and the sign-out path cannot disagree about
+ * how many tries are left or how long the wait is.
+ */
+async function verifyLockCode(value) {
+  const wait = lockCodeWaitSeconds();
+  if (wait > 0) {
+    return { ok: false, waitSeconds: wait, reason: `Too many wrong tries. Wait ${wait} seconds.` };
+  }
+  const record = await readLockCode();
+  if (record === null) return { ok: true, waitSeconds: 0 };
+
+  const salt = Buffer.from(record.salt, "base64");
+  const params = {
+    N: record.params?.N ?? LOCK_CODE_SCRYPT.N,
+    r: record.params?.r ?? LOCK_CODE_SCRYPT.r,
+    p: record.params?.p ?? LOCK_CODE_SCRYPT.p,
+    maxmem: LOCK_CODE_SCRYPT.maxmem,
+  };
+  const expected = Buffer.from(record.hash, "base64");
+  let given;
+  try {
+    given = deriveLockCode(typeof value === "string" ? value : "", salt, params);
+  } catch {
+    return { ok: false, waitSeconds: 0, reason: "Wrong code." };
+  }
+  const matches = given.length === expected.length && crypto.timingSafeEqual(given, expected);
+  if (matches) {
+    _lockCodeFailures = 0;
+    _lockCodeBlockedUntil = 0;
+    return { ok: true, waitSeconds: 0 };
+  }
+
+  _lockCodeFailures += 1;
+  if (_lockCodeFailures >= LOCK_CODE_FREE_ATTEMPTS) {
+    const seconds = Math.min(2 ** (_lockCodeFailures - LOCK_CODE_FREE_ATTEMPTS), LOCK_CODE_MAX_WAIT_SECONDS);
+    _lockCodeBlockedUntil = Date.now() + seconds * 1000;
+    return { ok: false, waitSeconds: seconds, reason: `Wrong code. Wait ${seconds} seconds.` };
+  }
+  const left = LOCK_CODE_FREE_ATTEMPTS - _lockCodeFailures;
+  return { ok: false, waitSeconds: 0, reason: `Wrong code. ${left} tr${left === 1 ? "y" : "ies"} left.` };
+}
+
+ipcMain.handle("lock:status", async () => {
+  const record = await readLockCode();
+  return {
+    hasCode: record !== null,
+    minLength: LOCK_CODE_MIN_LENGTH,
+    maxLength: LOCK_CODE_MAX_LENGTH,
+    waitSeconds: lockCodeWaitSeconds(),
+  };
+});
+
+// Setting a code, and removing one, both require the current code when the
+// wallet already has one: neither can be done from an unlocked window by
+// someone who does not know it. The renderer asks for it and passes it here;
+// this is where it is actually checked.
+ipcMain.handle("lock:set", async (_e, value, currentCode) => {
+  const shape = lockCodeShape(value);
+  if (!shape.ok) return shape;
+  if ((await readLockCode()) !== null) {
+    const current = await verifyLockCode(currentCode);
+    if (!current.ok) return { ...current, ok: false, reason: current.reason ?? "The current code is not right." };
+  }
+  const salt = crypto.randomBytes(LOCK_CODE_SALT_BYTES);
+  const record = {
+    version: 1,
+    salt: salt.toString("base64"),
+    hash: deriveLockCode(shape.code, salt, LOCK_CODE_SCRYPT).toString("base64"),
+    params: { N: LOCK_CODE_SCRYPT.N, r: LOCK_CODE_SCRYPT.r, p: LOCK_CODE_SCRYPT.p },
+  };
+  await writeLockCode(record);
+  _lockCodeFailures = 0;
+  _lockCodeBlockedUntil = 0;
+  return { ok: true };
+});
+
+ipcMain.handle("lock:clear", async (_e, currentCode) => {
+  if ((await readLockCode()) !== null) {
+    const current = await verifyLockCode(currentCode);
+    if (!current.ok) return { ...current, ok: false, reason: current.reason ?? "The current code is not right." };
+  }
+  await removeLockCode();
+  return { ok: true };
+});
+
+ipcMain.handle("lock:verify", async (_e, value) => verifyLockCode(value));
 
 // shell.openExternal and clipboard.writeText are not available in sandboxed preload —
 // route them through IPC so the main process performs the action.
@@ -2456,6 +2674,34 @@ ipcMain.handle("get-pending-uri", () => {
   const uri = pendingZcashUri;
   pendingZcashUri = null;
   return uri;
+});
+
+// Signing out: the renderer has already flushed the wallet and closed it (see
+// Routes.signOut) before asking for this, so all that is left is to end this
+// process and start a new one. A relaunch rather than an in-place reset, on
+// purpose: the next person at this computer gets a wallet that has never held
+// a key in this process, which is the same state a fresh double-click of the
+// launcher gives, and it is what signing out means everywhere else.
+ipcMain.handle("session:sign-out", async () => {
+  const mainWindow = BrowserWindow.getAllWindows()[0] ?? null;
+  // The sandboxed Mac App Store build and the Flatpak cannot relaunch
+  // themselves reliably — upstream hit exactly this with the wallet-folder
+  // change and the import path — so they say what to do instead of going
+  // quiet and leaving the user in front of a window that did not move.
+  if (process.mas || process.env.FLATPAK_ID) {
+    await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "Signed out",
+      message: "You are signed out.",
+      detail: `${SWARM_WINDOW_TITLE} will now close. Open it again to use your wallet.`,
+      buttons: ["Close"],
+    });
+    app.quit();
+    return { ok: true, relaunched: false };
+  }
+  app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
+  app.exit(0);
+  return { ok: true, relaunched: true };
 });
 
 ipcMain.on("apprestart", () => {

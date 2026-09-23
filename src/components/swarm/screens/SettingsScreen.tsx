@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "../Swarm.module.css";
 import { SwarmIcon, SwarmIconName } from "../SwarmIcons";
@@ -7,6 +7,8 @@ import { deriveStatus, serverHost } from "../swarmStatus";
 import { ContextApp } from "../../../context/ContextAppState";
 import MixnetModal from "../../sideBar/components/MixnetModal";
 import AppSecurityModal from "../../appSecurity/AppSecurityModal";
+import LockCodeModal from "../../lockScreen/LockCodeModal";
+import { ipcRenderer } from "../../../electronBridge";
 import routes from "../../../constants/routes.json";
 import APP_VERSION, { UPSTREAM_VERSION } from "../../../version";
 import { SWARM_NETWORK_LABEL, SWARM_TICKER } from "../../../utils/swarmNetwork";
@@ -34,7 +36,7 @@ type Group = { title: string; icon: SwarmIconName; rows: Row[] };
 
 export const SettingsScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { openImport, rescan } = useContext(SwarmActionsContext);
+  const { openImport, rescan, lockNow, signOut } = useContext(SwarmActionsContext);
   const {
     info,
     currentWallet,
@@ -49,6 +51,22 @@ export const SettingsScreen: React.FC = () => {
 
   const [mixnetOpen, setMixnetOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
+  const [lockCodeOpen, setLockCodeOpen] = useState(false);
+  // Whether a code is set is asked for here rather than passed in: the answer
+  // belongs to the main process, and this screen must not guess it — the row
+  // below says "Set…" or "Change…" depending on it.
+  const [hasLockCode, setHasLockCode] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const status: { hasCode?: boolean } = await ipcRenderer.invoke("lock:status");
+      if (live) setHasLockCode(!!status?.hasCode);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const status = deriveStatus(info, verificationProgress, syncingStatus);
 
@@ -130,6 +148,29 @@ export const SettingsScreen: React.FC = () => {
           // over IPC — so it is mounted here rather than routed through the
           // one the native menu opens.
           onClick: () => setSecurityOpen(true),
+        },
+        {
+          kind: "action",
+          k: "Wallet code",
+          d: hasLockCode
+            ? "A code is set. It is asked for every time this wallet is locked"
+            : "Set a code you type to open this wallet after locking it",
+          action: hasLockCode ? "Change…" : "Set…",
+          onClick: () => setLockCodeOpen(true),
+        },
+        {
+          kind: "action",
+          k: "Lock now",
+          d: "Lock the wallet without closing it — your code, or your device authentication, is asked for again",
+          action: "Lock",
+          onClick: lockNow,
+        },
+        {
+          kind: "action",
+          k: "Sign out",
+          d: "Close this wallet and start SWARM Wallet again from the beginning. Your wallets stay on this computer",
+          action: "Sign out",
+          onClick: signOut,
         },
         {
           kind: "value",
@@ -260,6 +301,11 @@ export const SettingsScreen: React.FC = () => {
 
       <MixnetModal modalIsOpen={mixnetOpen} closeModal={() => setMixnetOpen(false)} />
       <AppSecurityModal isOpen={securityOpen} onClose={() => setSecurityOpen(false)} />
+      <LockCodeModal
+        isOpen={lockCodeOpen}
+        onClose={() => setLockCodeOpen(false)}
+        onCodeChanged={(has) => setHasLockCode(has)}
+      />
     </>
   );
 };

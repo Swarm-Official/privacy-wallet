@@ -95,6 +95,12 @@ const AppRoutes: React.FC = () => {
   const [confirmModal, setConfirmModalState] = useState(defaultAppState.confirmModal);
   const [locked, setLocked] = useState(false);
   const [lockChecked, setLockChecked] = useState(false);
+  // What a lock asks for when it is applied. "code" is the code the user set;
+  // "device" is the operating system prompt, which is what this screen locked
+  // with before there was a code.
+  const [lockMode, setLockMode] = useState<"none" | "code" | "device">("none");
+  const [lockCodeSet, setLockCodeSet] = useState(false);
+  const [deviceLockAvailable, setDeviceLockAvailable] = useState(false);
   const [securityModalOpen, setSecurityModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importScanResult, setImportScanResult] = useState<ImportScanResult | null>(null);
@@ -277,12 +283,20 @@ const AppRoutes: React.FC = () => {
         })
         .catch((err) => console.log("address book ZNS migration failed", err));
 
-      const [allSettings, authAvailability] = await Promise.all([
+      const [allSettings, authAvailability, lockStatus] = await Promise.all([
         ipcRenderer.invoke("loadSettings"),
         ipcRenderer.invoke("auth:check"),
+        ipcRenderer.invoke("lock:status"),
       ]);
-      const isLocked = !!(allSettings?.requireDeviceAuth && authAvailability === "available");
-      setLocked(isLocked);
+      // A code comes first. It is the lock the user set on purpose, and the one
+      // they will look for; device authentication is the fallback when no code
+      // is set, which is how this wallet locked before there was a code.
+      const hasCode = !!lockStatus?.hasCode;
+      const deviceLock = !!(allSettings?.requireDeviceAuth && authAvailability === "available");
+      setLockCodeSet(hasCode);
+      setDeviceLockAvailable(deviceLock);
+      setLockMode(hasCode ? "code" : deviceLock ? "device" : "none");
+      setLocked(hasCode || deviceLock);
       setLockChecked(true);
       if (allSettings && Object.prototype.hasOwnProperty.call(allSettings, "blockexplorer")) {
         // A previously-selected explorer may have been removed (e.g. Zypherscan).
@@ -378,6 +392,72 @@ const AppRoutes: React.FC = () => {
     modal.modalIsOpen = false;
     setConfirmModalState(modal);
   }, []);
+
+  // --- locking and signing out ---
+  /**
+   * Ending the session for real: the wallet file is flushed, the wallet is
+   * closed (so this process stops holding keys), and the application is
+   * started again as a new process — the same state as a fresh double-click of
+   * the launcher. Nothing is deleted: the wallet stays on this computer.
+   */
+  const signOutNow = useCallback(async () => {
+    try {
+      // The same best-effort flush the close path uses, capped so a slow disk
+      // cannot leave someone looking at a window that will not go away.
+      const save = native.save_wallet_file().catch(() => {});
+      const cap = new Promise<void>((resolve) => setTimeout(resolve, 800));
+      await Promise.race([save, cap]);
+      await native.deinitialize().catch(() => {});
+    } finally {
+      await ipcRenderer.invoke("session:sign-out");
+    }
+  }, []);
+
+  const signOut = useCallback(() => {
+    openConfirmModal(
+      "Sign out?",
+      "SWARM Wallet will close and start again from the beginning. Your wallets and balances stay on this computer — signing out deletes nothing. Keep your recovery phrase: it is the only way into a wallet whose code has been forgotten.",
+      () => {
+        void signOutNow();
+      },
+    );
+  }, [openConfirmModal, signOutNow]);
+
+  /**
+   * Locking needs something to come back in with. A code is the first choice;
+   * device authentication is the fallback, and it only works where the platform
+   * offers it and the user asked for it. With neither, locking would leave a
+   * wallet nobody can open again, so this explains what to set rather than
+   * doing that.
+   */
+  const lockNow = useCallback(() => {
+    if (lockCodeSet) {
+      setLockMode("code");
+      setLocked(true);
+      return;
+    }
+    if (deviceLockAvailable) {
+      setLockMode("device");
+      setLocked(true);
+      return;
+    }
+    openConfirmModal(
+      "Set a code first",
+      "Locking this wallet needs something to unlock it with. Set a wallet code (Settings → Security → Wallet code), or turn on Unlock with Windows Hello under App Security. Until one of those is on, locking would leave the wallet with no way back in.",
+      () => setSecurityModalOpen(true),
+    );
+  }, [deviceLockAvailable, lockCodeSet, openConfirmModal]);
+
+  // The native menu's Lock Wallet and Sign Out items, wired to the same
+  // handlers the buttons call, so a keyboard shortcut and a click can never do
+  // two different things. Declared after the handlers on purpose: a listener
+  // registered before them would close over nothing.
+  useEffect(() => {
+    const lockListener = () => lockNow();
+    const signOutListener = () => signOut();
+    const subscriptions = [ipcRenderer.on("lockwallet", lockListener), ipcRenderer.on("signout", signOutListener)];
+    return () => subscriptions.forEach((cancel) => cancel());
+  }, [lockNow, signOut]);
 
   // --- navigation ---
   const navigateToDashboard = useCallback(() => {
@@ -790,8 +870,10 @@ const AppRoutes: React.FC = () => {
       },
       rescan: runRPCRescan,
       retrySync: runRPCRetrySync,
+      lockNow,
+      signOut,
     }),
-    [runRPCRescan, runRPCRetrySync],
+    [runRPCRescan, runRPCRetrySync, lockNow, signOut],
   );
 
   if (!lockChecked) return null;
@@ -799,7 +881,11 @@ const AppRoutes: React.FC = () => {
   if (locked) {
     return (
       <ContextAppProvider value={contextAppState}>
-        <LockScreen onUnlock={() => setLocked(false)} />
+        <LockScreen
+          mode={lockMode === "code" ? "code" : "device"}
+          onUnlock={() => setLocked(false)}
+          onSignOut={signOut}
+        />
       </ContextAppProvider>
     );
   }

@@ -115,6 +115,32 @@
   gap: 10px;
 }
 
+/* Lock and sign out. They act on the session rather than on a wallet, so they
+   sit together in the rail — visible from every screen, which is the whole
+   point: the owner's report was that there was no sign-out button anywhere. */
+.railActions {
+  display: flex;
+  gap: 8px;
+}
+
+.railAction {
+  composes: btn;
+  flex: 1;
+  justify-content: center;
+  font-size: 12.5px;
+  padding: 9px 10px;
+}
+
+.railSignOut {
+  composes: railAction;
+  border-color: var(--swarm-hairline-strong);
+  color: var(--swarm-text-muted);
+}
+
+.railSignOut:hover:not(:disabled) {
+  color: var(--swarm-text);
+}
+
 /* --------------------------------------------------------- status chip --- */
 
 .statusChip {

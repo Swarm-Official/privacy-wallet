@@ -5,6 +5,7 @@ import { SwarmIcon, SwarmIconName } from "./SwarmIcons";
 import { SwarmProblemBar } from "./SwarmProblem";
 import { SwarmWalletMenu } from "./SwarmWalletMenu";
 import SwarmUiContext from "./SwarmUiContext";
+import { SwarmActionsContext } from "./SwarmActionsContext";
 import { currentProblem, deriveStatus } from "./swarmStatus";
 import HiveBee from "../logo/HiveBee";
 import { ContextApp } from "../../context/ContextAppState";
@@ -87,6 +88,7 @@ export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry }) => 
   const navigate = useNavigate();
   const location = useLocation();
   const { hidden, toggleHidden } = useContext(SwarmUiContext);
+  const { lockNow, signOut } = useContext(SwarmActionsContext);
   const { info, verificationProgress, syncingStatus, fetchError, readOnly, currentWallet, reopenWallet } =
     useContext(ContextApp);
 
@@ -137,6 +139,31 @@ export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry }) => 
               {status.label.toUpperCase()}
             </div>
             <div className={styles.statusDetail}>{status.detail}</div>
+          </div>
+          {/*
+            Lock and sign out live here, above the version line, so they are in
+            the same place on every screen. Sign out in particular was asked for
+            by name: it ends the session completely and starts the application
+            again, which is what the Sign out button in any other application
+            does.
+          */}
+          <div className={styles.railActions}>
+            <button
+              type="button"
+              className={styles.railAction}
+              onClick={lockNow}
+              title="Lock the wallet — your code, or your device authentication, is asked for again"
+            >
+              Lock
+            </button>
+            <button
+              type="button"
+              className={styles.railSignOut}
+              onClick={signOut}
+              title="Sign out — closes SWARM Wallet and starts it again"
+            >
+              Sign out
+            </button>
           </div>
           <div className={styles.versionLine}>
             SWARM Wallet {APP_VERSION}

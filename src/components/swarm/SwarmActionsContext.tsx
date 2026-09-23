@@ -21,6 +21,10 @@ export type SwarmActions = {
   rescan: () => void;
   /** Re-run the ordinary sync now. */
   retrySync: () => void;
+  /** Lock the wallet now: the code screen (or the device prompt) comes back. */
+  lockNow: () => void;
+  /** End the session: the wallet is closed and the application starts again. */
+  signOut: () => void;
 };
 
 export const SwarmActionsContext = React.createContext<SwarmActions>({
@@ -28,6 +32,8 @@ export const SwarmActionsContext = React.createContext<SwarmActions>({
   openImport: () => {},
   rescan: () => {},
   retrySync: () => {},
+  lockNow: () => {},
+  signOut: () => {},
 });
 
 export default SwarmActionsContext;
