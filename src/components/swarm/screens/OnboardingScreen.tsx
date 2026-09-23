@@ -2,7 +2,7 @@ import React, { ReactNode, useContext, useState } from "react";
 import { useLocation } from "react-router-dom";
 import styles from "../Swarm.module.css";
 import { SwarmIcon } from "../SwarmIcons";
-import HiveBee from "../../logo/HiveBee";
+import SwarmMark from "../../logo/SwarmMark";
 import { ContextApp } from "../../../context/ContextAppState";
 import { SWARM_NETWORK_LABEL, SWARM_TICKER } from "../../../utils/swarmNetwork";
 
@@ -56,7 +56,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ children }) 
       <div className={styles.onboardWrap}>
         <div className={styles.onboardCard}>
           <div className={styles.onboardBee} aria-hidden="true">
-            <HiveBee size={72} background="var(--swarm-surface)" animated />
+            <SwarmMark size={72} animated />
           </div>
           <div className={styles.kicker}>{SWARM_NETWORK_LABEL}</div>
           <h2 className={styles.onboardTitle}>Private money, on your computer.</h2>
@@ -101,7 +101,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ children }) 
     <div className={styles.onboardFrame}>
       <div className={styles.onboardHead}>
         <div className={styles.brand}>
-          <HiveBee size={26} background="var(--swarm-surface)" />
+          <SwarmMark size={26} />
           <div className={styles.brandName}>SWARM</div>
         </div>
         <div>

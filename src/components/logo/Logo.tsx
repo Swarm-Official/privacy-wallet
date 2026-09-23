@@ -3,7 +3,7 @@ import { faSnowflake } from "@fortawesome/free-solid-svg-icons";
 import Utils from "../../utils/utils";
 import APP_VERSION from "../../version";
 import { SWARM_APP_NAME } from "../../utils/swarmNetwork";
-import HiveBee from "./HiveBee";
+import SwarmMark from "./SwarmMark";
 
 type LogoProps = {
   onlyVersion: boolean;
@@ -27,7 +27,7 @@ const Logo = ({ readOnly, onlyVersion }: LogoProps) => {
       </div>
       {!onlyVersion && (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <HiveBee size={70} animated />
+          <SwarmMark size={70} animated />
           {readOnly && (
             <FontAwesomeIcon
               icon={faSnowflake}

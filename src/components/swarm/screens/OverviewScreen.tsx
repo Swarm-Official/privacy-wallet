@@ -7,7 +7,7 @@ import { deriveBalances, formatSwm, maskAmount, toActivityRows } from "../swarmM
 import { ActivityList } from "../components/ActivityList";
 import { ContextApp } from "../../../context/ContextAppState";
 import routes from "../../../constants/routes.json";
-import HiveBee from "../../logo/HiveBee";
+import SwarmMark from "../../logo/SwarmMark";
 import { SWARM_TICKER } from "../../../utils/swarmNetwork";
 import { ZcashURITarget } from "../../../utils/uris";
 
@@ -71,7 +71,7 @@ export const OverviewScreen: React.FC = () => {
       <section className={styles.balanceCard} aria-label="Total balance">
         <div className={styles.balanceFlow} />
         <div className={styles.balanceBee} aria-hidden="true">
-          <HiveBee size={88} background="#15110d" animated />
+          <SwarmMark size={88} animated />
         </div>
         <div className={styles.balanceInner}>
           <div className={styles.balanceKicker}>

@@ -1,3 +1,4 @@
 import Logo from "./Logo";
+import SwarmMark from "./SwarmMark";
 
-export { Logo };
+export { Logo, SwarmMark };

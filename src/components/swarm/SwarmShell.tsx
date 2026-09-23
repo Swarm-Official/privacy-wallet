@@ -7,7 +7,7 @@ import { SwarmWalletMenu } from "./SwarmWalletMenu";
 import SwarmUiContext from "./SwarmUiContext";
 import { SwarmActionsContext } from "./SwarmActionsContext";
 import { currentProblem, deriveStatus } from "./swarmStatus";
-import HiveBee from "../logo/HiveBee";
+import SwarmMark from "../logo/SwarmMark";
 import { ContextApp } from "../../context/ContextAppState";
 import routes from "../../constants/routes.json";
 import APP_VERSION from "../../version";
@@ -105,7 +105,7 @@ export const SwarmShell: React.FC<SwarmShellProps> = ({ children, onRetry }) => 
     <div className={styles.shell}>
       <nav className={styles.rail} aria-label="Wallet sections">
         <div className={styles.brand}>
-          <HiveBee size={28} background="var(--swarm-surface-sunken)" />
+          <SwarmMark size={28} />
           <div className={styles.brandName}>SWARM</div>
         </div>
 
