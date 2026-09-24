@@ -55,12 +55,18 @@ jobs:
             vendor/zingolib/zingo-netutils/target
           key: swarm-windows-rust196-nu63-${{ hashFiles('native/Cargo.lock', 'native/src/lib.rs', 'sdk/swarm-sdk-pin.json') }}
           restore-keys: swarm-windows-rust196-nu63-
+      - name: Install pinned Protocol Buffers compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          version: '36.2'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify Protocol Buffers compiler
+        run: protoc --version
       - name: Install build prerequisites
         shell: pwsh
         run: |
           rustup toolchain install 1.96.0 --profile minimal
           rustup default 1.96.0
-          choco install protoc --no-progress -y
           npm install --global yarn@1.22.22
       - name: Install locked JavaScript dependencies
         run: yarn install --frozen-lockfile
