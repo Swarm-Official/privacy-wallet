@@ -6,6 +6,11 @@ name: SWARM wallet Linux and macOS test build
 # only fires for workflows on the default branch, and this one is not there.
 on:
   workflow_dispatch:
+    inputs:
+      verify_signed_intel:
+        description: 'Verify the published signed Intel DMG on an Intel Mac'
+        type: boolean
+        default: false
   push:
     tags:
       - "swarm-unix-*"
@@ -18,7 +23,8 @@ env:
   CARGO_PROFILE_RELEASE_LTO: "false"
   CARGO_INCREMENTAL: "0"
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-  # No Apple account exists, so nothing may go looking for a signing identity.
+  # CI produces unsigned integration artifacts. The owner Mac uses the
+  # separate Developer ID config and a local Keychain notarytool profile.
   CSC_IDENTITY_AUTO_DISCOVERY: "false"
   RUSTUP_TOOLCHAIN: "1.96.0"
   RUSTFLAGS: '--cfg zcash_unstable="nu6.3"'
@@ -26,6 +32,7 @@ env:
 
 jobs:
   unix-wallet:
+    if: ${{ !inputs.verify_signed_intel }}
     strategy:
       # One platform failing must not cancel the other: a macOS toolchain
       # problem should still leave a Linux package to ship.
@@ -211,3 +218,45 @@ jobs:
             dist/Cargo.lock
             dist/sdk-integration.json
           retention-days: 14
+
+  verify-signed-intel:
+    if: ${{ inputs.verify_signed_intel }}
+    runs-on: macos-15-intel
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Download the published signed Intel packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p signed-intel
+          gh release download swarm-wallet-0.1.0-testnet.7 \
+            --repo Swarm-Official/swarm-releases \
+            --pattern 'SWARM-Wallet-0.1.0-testnet.7-x64.*' \
+            --pattern 'SHA256SUMS-mac-x64' --dir signed-intel
+          cd signed-intel
+          shasum -a 256 -c SHA256SUMS-mac-x64
+      - name: Verify Gatekeeper and launch the exact signed DMG app
+        run: |
+          set -euo pipefail
+          dmg=signed-intel/SWARM-Wallet-0.1.0-testnet.7-x64.dmg
+          hdiutil verify "$dmg"
+          xcrun stapler validate "$dmg"
+          hdiutil attach -readonly -nobrowse -mountpoint /Volumes/SWARM-Wallet-Intel-Verify "$dmg"
+          app='/Volumes/SWARM-Wallet-Intel-Verify/SWARM Wallet Testnet.app'
+          node scripts/check-swarm-macho-arch.js mac-x64 /Volumes/SWARM-Wallet-Intel-Verify
+          codesign --verify --deep --strict "$app"
+          spctl --assess --type execute --verbose=4 "$app"
+          xcrun stapler validate "$app"
+          node scripts/check-swarm-prefix-native.js "$app/Contents/Resources/app.asar.unpacked/build/native.node"
+          SWARM_DIST=/Volumes/SWARM-Wallet-Intel-Verify \
+            SWARM_SMOKE_DIAGNOSTICS="$GITHUB_WORKSPACE/signed-intel/smoke-diagnostics" \
+            node scripts/swarm-smoke.js mac
+          ditto -x -k signed-intel/SWARM-Wallet-0.1.0-testnet.7-x64.zip signed-intel/zip-app
+          codesign --verify --deep --strict 'signed-intel/zip-app/SWARM Wallet Testnet.app'
+      - name: Detach the test image
+        if: always()
+        run: hdiutil detach /Volumes/SWARM-Wallet-Intel-Verify || true

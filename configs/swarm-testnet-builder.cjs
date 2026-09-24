@@ -49,9 +49,9 @@ module.exports = {
     productName: PRODUCT,
     description: "Wallet for the SwarmTestnet network. Test coins with no value.",
   },
-  // Upstream's hooks exist to sign and notarise for the App Store. There is
-  // no Apple account behind this build, so they are removed rather than left
-  // to fail.
+  // This is the unsigned integration baseline. The separate
+  // swarm-mac-developer-id.cjs config enables direct-download Mac signing and
+  // notarization after the pinned native components have been built.
   afterSign: null,
   afterAllArtifactBuild: null,
   win: {
@@ -135,10 +135,8 @@ module.exports = {
     // only place the conversion tooling exists.
     icon: "./resources/swarm/icon-1024.png",
     target: ["dmg", "zip"],
-    // Unsigned and un-notarised: there is no Apple account. `identity: null`
-    // stops electron-builder hunting the keychain for one, and the hardened
-    // runtime is turned off because it only means anything to a signed
-    // binary and its entitlements file is written for signing.
+    // Unsigned local/CI test build. `identity: null` stops electron-builder
+    // from silently selecting a development identity for this baseline.
     identity: null,
     hardenedRuntime: false,
     gatekeeperAssess: false,
