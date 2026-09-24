@@ -9,14 +9,17 @@ const { execFileSync } = require('child_process');
 const developerIdIdentity = require('./mac-distribution-identity.cjs');
 
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'dist-mac-signed');
+const archFlag = process.argv.indexOf('--arch');
+const arch = archFlag < 0 ? 'arm64' : process.argv[archFlag + 1];
+if (!['arm64', 'x64'].includes(arch)) throw new Error(`Unsupported Mac architecture: ${arch}`);
+const output = path.join(root, arch === 'x64' ? 'dist-mac-signed-x64' : 'dist-mac-signed');
 const versionSource = fs.readFileSync(path.join(root, 'src/version.ts'), 'utf8');
 const version = /const APP_VERSION = "([^"]+)"/.exec(versionSource)?.[1];
 const profile = process.env.APPLE_KEYCHAIN_PROFILE;
 const resume = process.argv.includes('--resume');
-const app = path.join(output, 'mac-arm64', 'SWARM Wallet Testnet.app');
-const dmgName = `SWARM-Wallet-${version}-arm64.dmg`;
-const zipName = `SWARM-Wallet-${version}-arm64.zip`;
+const app = path.join(output, arch === 'x64' ? 'mac' : 'mac-arm64', 'SWARM Wallet Testnet.app');
+const dmgName = `SWARM-Wallet-${version}-${arch}.dmg`;
+const zipName = `SWARM-Wallet-${version}-${arch}.zip`;
 const dmg = path.join(output, dmgName);
 const zip = path.join(output, zipName);
 const sha = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -52,12 +55,15 @@ for (const file of ['build/electron.js', 'build/native.node', 'resources/nym-pro
 }
 
 run('node', ['scripts/check-swarm-sdk-pin.js', 'sdk-source', '--require-real-genesis']);
-if (!resume) run('yarn', ['electron-builder', '--mac', '--arm64', '--config', 'configs/swarm-mac-developer-id.cjs', '--publish', 'never']);
-run('node', ['scripts/check-swarm-macho-arch.js', 'mac-arm64', output]);
+if (!resume) run('yarn', ['electron-builder', '--mac', `--${arch}`, '--config', 'configs/swarm-mac-developer-id.cjs', '--publish', 'never'],
+  { env: { ...process.env, SWARM_MAC_ARCH: arch } });
+run('node', ['scripts/check-swarm-macho-arch.js', `mac-${arch}`, output]);
 run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', app]);
 run('xcrun', ['stapler', 'validate', app]);
 run('spctl', ['--assess', '--type', 'execute', '--verbose=4', app]);
-run('node', ['scripts/swarm-smoke.js', 'mac'], { env: { ...process.env, SWARM_DIST: output } });
+if (!process.argv.includes('--skip-smoke')) {
+  run('node', ['scripts/swarm-smoke.js', 'mac'], { env: { ...process.env, SWARM_DIST: output } });
+}
 
 // electron-builder notarizes/staples the app before writing this DMG. Submit
 // the final DMG as well, then staple its own ticket and rebuild the ZIP.
@@ -87,7 +93,7 @@ const manifest = {
   product: 'SWARM Wallet (Testnet)',
   version,
   app_id: 'green.swarm.wallet.testnet',
-  platform: 'darwin-arm64',
+  platform: `darwin-${arch}`,
   signed: true,
   notarized: true,
   notary_submission_id: result.id,

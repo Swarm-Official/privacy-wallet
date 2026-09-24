@@ -5,14 +5,16 @@
 // overridden here; the generic upstream/MAS configuration is never used.
 const base = require("./swarm-testnet-builder.cjs");
 const developerIdIdentity = require("../scripts/mac-distribution-identity.cjs");
+const arch = process.env.SWARM_MAC_ARCH || "arm64";
+if (!["arm64", "x64"].includes(arch)) throw new Error(`Unsupported SWARM_MAC_ARCH: ${arch}`);
 
 module.exports = {
   ...base,
-  directories: { ...base.directories, output: "dist-mac-signed" },
+  directories: { ...base.directories, output: arch === "x64" ? "dist-mac-signed-x64" : "dist-mac-signed" },
   afterSign: "./scripts/verify-mac-signed-app.cjs",
   mac: {
     ...base.mac,
-    target: [{ target: "dmg", arch: ["arm64"] }, { target: "zip", arch: ["arm64"] }],
+    target: [{ target: "dmg", arch: [arch] }, { target: "zip", arch: [arch] }],
     // electron-builder selects the Developer ID certificate type itself and
     // rejects the "Developer ID Application:" prefix in an explicit identity.
     identity: developerIdIdentity().replace(/^Developer ID Application:\s*/, ""),
