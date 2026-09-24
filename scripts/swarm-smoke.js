@@ -38,7 +38,7 @@ const platform = process.argv[2];
 if (!["linux", "mac"].includes(platform)) throw new Error("usage: swarm-smoke.js <linux|mac>");
 
 const dist = path.resolve(process.env.SWARM_DIST || path.join(__dirname, "../dist"));
-const diagnostics = path.join(dist, "smoke-diagnostics");
+const diagnostics = path.resolve(process.env.SWARM_SMOKE_DIAGNOSTICS || path.join(dist, "smoke-diagnostics"));
 
 const findUnder = (root, predicate) => {
   if (!fs.existsSync(root)) return null;

@@ -248,7 +248,9 @@ jobs:
           spctl --assess --type execute --verbose=4 "$app"
           xcrun stapler validate "$app"
           node scripts/check-swarm-prefix-native.js "$app/Contents/Resources/app.asar.unpacked/build/native.node"
-          SWARM_DIST=/Volumes/SWARM-Wallet-Intel-Verify node scripts/swarm-smoke.js mac
+          SWARM_DIST=/Volumes/SWARM-Wallet-Intel-Verify \
+            SWARM_SMOKE_DIAGNOSTICS="$GITHUB_WORKSPACE/signed-intel/smoke-diagnostics" \
+            node scripts/swarm-smoke.js mac
           ditto -x -k signed-intel/SWARM-Wallet-0.1.0-testnet.7-x64.zip signed-intel/zip-app
           codesign --verify --deep --strict 'signed-intel/zip-app/SWARM Wallet Testnet.app'
       - name: Detach the test image
