@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/Swarm-Official/privacy-zingolib",
   "branch": "codex/swarm-prefix-sdk",
-  "commit": "23321888779d6ebcbccad6e34bd90a570a29e669",
+  "commit": "ef08aa252ec55f411dc937045548cd4f3f3dc664",
   "chainName": "swarm-testnet",
   "genesis": "045993f5c91ea160c7ebda573dd97b0016816bca68d395bfff202779b88e2a28",
   "genesisIsPlaceholder": false,
@@ -20,7 +20,9 @@
   },
   "status": "SwarmTestnet development build against the final genesis, whose block is stamped in the past so the chain can produce block 1 immediately. Unsigned, not a release, and no wallet safety claim.",
   "verified": [
-    "SDK CI 35937336092: prefix, persisted-wallet and CLI recovery tests passed",
+    "SDK rollback and compatibility CI passed: https://github.com/Swarm-Official/privacy-zingolib/actions/runs/35994451073",
+    "Same-height reorg regression: fails before correction, passes after; 120 sync tests passed, 4 existing ignored",
+    "Local feature sweep passed 25 combinations across pepper-sync, zingolib and CLI",
     "Encoding proof CI 35938381018: 2304 fixtures per protocol version, including client 0.10.5"
   ]
 }
