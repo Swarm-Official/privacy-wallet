@@ -18,7 +18,8 @@ env:
   CARGO_PROFILE_RELEASE_LTO: "false"
   CARGO_INCREMENTAL: "0"
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-  # No Apple account exists, so nothing may go looking for a signing identity.
+  # CI produces unsigned integration artifacts. The owner Mac uses the
+  # separate Developer ID config and a local Keychain notarytool profile.
   CSC_IDENTITY_AUTO_DISCOVERY: "false"
   RUSTUP_TOOLCHAIN: "1.96.0"
   RUSTFLAGS: '--cfg zcash_unstable="nu6.3"'

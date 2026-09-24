@@ -15,9 +15,9 @@
 // listening the whole time. Where the profile actually landed is now something
 // this reports rather than assumes.
 //
-// It goes exactly as far as the unlock screen: no wallet is created, no key
-// material exists, and HOME is a directory thrown away with the runner.
-const { spawnSync, spawn } = require("child_process");
+// It goes only as far as the first settled screen: no wallet is created, no
+// key material exists, and HOME is a directory thrown away with the runner.
+const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -37,7 +37,7 @@ const RENDER_TIMEOUT_MS = 120_000;
 const platform = process.argv[2];
 if (!["linux", "mac"].includes(platform)) throw new Error("usage: swarm-smoke.js <linux|mac>");
 
-const dist = path.resolve(__dirname, "../dist");
+const dist = path.resolve(process.env.SWARM_DIST || path.join(__dirname, "../dist"));
 const diagnostics = path.join(dist, "smoke-diagnostics");
 
 const findUnder = (root, predicate) => {
@@ -91,7 +91,6 @@ const stop = () => {
   } catch {
     /* already gone */
   }
-  if (platform === "mac") spawnSync("pkill", ["-f", EXECUTABLE]);
 };
 
 (async () => {
@@ -126,11 +125,21 @@ const stop = () => {
       "first-paint.txt": result.text || "(empty)",
     });
 
-    // macOS runners have Touch ID, so the wallet correctly stops at the lock
-    // screen; Linux has no device authentication, so the gate succeeds and the
-    // profile — which has no wallet — is routed to onboarding. Both are right,
-    // and which one to expect is known here.
-    const seen = assertLandingScreen(settled, { deviceAuth: platform === "mac" });
+    // Device authentication depends on actual enrollment, not the operating
+    // system. A Mac without Touch ID enrolled correctly reaches onboarding.
+    // Ask the packaged app through its own IPC bridge before judging the gate.
+    const auth = await devtools.evaluate(`Promise.all([
+      window.electronAPI.ipcRenderer.invoke("auth:check"),
+      window.electronAPI.ipcRenderer.invoke("loadSettings")
+    ]).then(([availability, settings]) => ({
+      availability,
+      required: settings && settings.requireDeviceAuth === true
+    }))`);
+    if (!auth || typeof auth.availability !== "string" || typeof auth.required !== "boolean") {
+      throw new Error("Could not read device-authentication state from the packaged wallet");
+    }
+    fs.writeFileSync(path.join(diagnostics, "auth-check.txt"), JSON.stringify(auth, null, 2) + "\n");
+    const seen = assertLandingScreen(settled, { deviceAuth: auth.required && auth.availability === "available" });
     console.log(
       seen.screen === "lock"
         ? "\nThe packaged wallet started and stopped at its device-authentication lock screen, named correctly."

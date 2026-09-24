@@ -85,7 +85,7 @@ class Devtools {
   }
 
   async evaluate(expression) {
-    const { result } = await this.send("Runtime.evaluate", { expression, returnByValue: true });
+    const { result } = await this.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
     return result?.value;
   }
 
@@ -185,9 +185,10 @@ function listTree(root, limit = 400) {
 
 /**
  * Checks where a profile with no wallet lands, in two stages, because that
- * depends on whether the machine has device authentication.
+ * depends on whether the machine has device authentication available and the
+ * wallet's security setting requires it.
  *
- * Where it does — a Mac with Touch ID, the owner's PC with Windows Hello — the
+ * Where it does — a Mac with Touch ID enrolled, or a PC with Windows Hello — the
  * landing screen is the lock screen, and everything else is behind it. Where it
  * does not, the gate succeeds silently and the app routes on: a throwaway
  * profile has no wallet, so it belongs on the onboarding welcome, which says
@@ -202,7 +203,8 @@ function listTree(root, limit = 400) {
  * a wallet — so the dashboard appearing here is a failure with a name, not an
  * unrecognised screen. `deviceAuth` says which case the caller is in, so a lock
  * screen where onboarding was expected (or the reverse) is reported rather than
- * quietly accepted.
+ * quietly accepted. The caller reads availability and the saved requirement
+ * from the packaged app, rather than guessing from the operating system.
  *
  * The lock is never passed in CI. There is no device to authenticate with and
  * nothing here should behave as though there were.

@@ -33,7 +33,7 @@ if (process.platform !== "darwin") {
   process.exit(2);
 }
 
-const dist = path.resolve(__dirname, "../dist");
+const dist = path.resolve(process.argv[3] || path.join(__dirname, "../dist"));
 
 const findApp = (root) => {
   if (!fs.existsSync(root)) return null;
