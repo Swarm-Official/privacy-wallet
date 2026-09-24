@@ -43,6 +43,11 @@ then rebuilds the ZIP from the stapled app. Output is in `dist-mac-signed/out/`
 with SHA256 checksums and a release manifest. The script refuses to overwrite
 an existing signed output directory.
 
+If signing and packaging completed but a later local check or DMG notarization
+failed, fix the cause and rerun the last command with `--resume`. Resume requires
+the generated app, DMG and ZIP, rechecks signatures and stapling, and refuses
+an output that already contains finalized release files.
+
 Before release, install a **fresh browser download** with default Gatekeeper
 settings and verify `codesign --verify --deep --strict`, `spctl --assess`, and
 `xcrun stapler validate`. Test launch and sync, existing-profile preservation,

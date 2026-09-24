@@ -74,6 +74,10 @@ if (platform === "linux") {
   if (!app) throw new Error("no .app in dist");
   command = path.join(app, "Contents", "MacOS", EXECUTABLE);
   if (!fs.existsSync(command)) throw new Error(`no executable at ${command}`);
+  // macOS can keep an existing copy of this product open. Give the test app
+  // its own Electron profile so its single-instance lock cannot collide with
+  // the user's running wallet or access the user's wallet data.
+  args.unshift(`--user-data-dir=${path.join(home, "Library", "Application Support", PRODUCT)}`);
   console.log(`Starting ${path.basename(app)}.`);
 }
 

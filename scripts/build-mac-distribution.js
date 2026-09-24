@@ -13,6 +13,7 @@ const output = path.join(root, 'dist-mac-signed');
 const versionSource = fs.readFileSync(path.join(root, 'src/version.ts'), 'utf8');
 const version = /const APP_VERSION = "([^"]+)"/.exec(versionSource)?.[1];
 const profile = process.env.APPLE_KEYCHAIN_PROFILE;
+const resume = process.argv.includes('--resume');
 const app = path.join(output, 'mac-arm64', 'SWARM Wallet Testnet.app');
 const dmgName = `SWARM-Wallet-${version}-arm64.dmg`;
 const zipName = `SWARM-Wallet-${version}-arm64.zip`;
@@ -38,13 +39,20 @@ try {
 } catch {
   throw new Error(`Cannot use notarytool Keychain profile ${profile}; configure it locally before building`);
 }
-if (fs.existsSync(output)) throw new Error(`${output} exists; archive or remove previous generated output before rebuilding`);
+if (resume) {
+  for (const file of [app, dmg, zip]) {
+    if (!fs.existsSync(file)) throw new Error(`Cannot resume without generated output: ${file}`);
+  }
+  if (fs.existsSync(path.join(output, 'out'))) throw new Error('Signed release output already finalized');
+} else if (fs.existsSync(output)) {
+  throw new Error(`${output} exists; archive or remove previous generated output before rebuilding`);
+}
 for (const file of ['build/electron.js', 'build/native.node', 'resources/nym-proxy', 'sdk-source/LICENSE']) {
   if (!fs.existsSync(path.join(root, file))) throw new Error(`Missing build prerequisite: ${file}`);
 }
 
 run('node', ['scripts/check-swarm-sdk-pin.js', 'sdk-source', '--require-real-genesis']);
-run('yarn', ['electron-builder', '--mac', '--arm64', '--config', 'configs/swarm-mac-developer-id.cjs', '--publish', 'never']);
+if (!resume) run('yarn', ['electron-builder', '--mac', '--arm64', '--config', 'configs/swarm-mac-developer-id.cjs', '--publish', 'never']);
 run('node', ['scripts/check-swarm-macho-arch.js', 'mac-arm64', output]);
 run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', app]);
 run('xcrun', ['stapler', 'validate', app]);
