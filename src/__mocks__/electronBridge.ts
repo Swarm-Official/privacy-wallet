@@ -6,6 +6,7 @@ export const native = {
   wallet_exists: jest.fn(),
   wallet_kind: jest.fn(),
   init_from_b64: jest.fn(),
+  init_new: jest.fn(),
   set_crypto_default_provider_to_ring: jest.fn(),
   set_wallet_base_dir: jest.fn(),
   start_security_scoped_access: jest.fn(),

@@ -10,7 +10,7 @@
  * release; it is not part of the build, so this value stands until a SWARM
  * release changes it deliberately.
  */
-const APP_VERSION = "0.1.0-testnet.8";
+const APP_VERSION = "0.1.0-testnet.9";
 
 /** Upstream's release, for the About box. */
 export const UPSTREAM_VERSION = "2.0.26 (188)";

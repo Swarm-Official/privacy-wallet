@@ -196,10 +196,37 @@ const AppRoutes: React.FC = () => {
   const setWallets = useCallback((val: WalletType[]) => setWalletsState(val), []);
   const setBirthday = useCallback((val: number) => setBirthdayState(val), []);
 
-  const setCurrentWallet = useCallback((val: WalletType | null) => {
-    if (val !== null) rpcRef.current?.setCurrentWallet(val);
-    setCurrentWalletState(val);
+  const clearWalletView = useCallback(() => {
+    setTotalBalanceState(new TotalBalanceClass());
+    setAddressesUnifiedState([]);
+    setAddressesTransparentState([]);
+    setValueTransfersState([]);
+    setMessagesState([]);
+    setInfoState(new InfoClass());
+    setZecPriceState(0);
+    setSyncingStatusState({} as SyncStatusType);
+    setVerificationProgressState(null);
+    if (fetchErrorTimer.current) clearTimeout(fetchErrorTimer.current);
+    setFetchErrorState({} as FetchErrorTypeClass);
+    setCurrentWalletOpenErrorState("");
+    setSendPageStateState(new SendPageStateClass());
   }, []);
+
+  const setCurrentWallet = useCallback(
+    (val: WalletType | null) => {
+      const previous = rpcRef.current?.currentWallet;
+      rpcRef.current?.setCurrentWallet(val);
+      if (
+        previous?.id !== val?.id ||
+        previous?.fileName !== val?.fileName ||
+        previous?.chain_name !== val?.chain_name
+      ) {
+        clearWalletView();
+      }
+      setCurrentWalletState(val);
+    },
+    [clearWalletView],
+  );
 
   const setCurrentWalletOpenError = useCallback((val: string) => setCurrentWalletOpenErrorState(val), []);
 
@@ -475,37 +502,11 @@ const AppRoutes: React.FC = () => {
   }, [navigate]);
 
   const navigateToLoadingScreenChangingWallet = useCallback(async () => {
-    setTotalBalance(new TotalBalanceClass());
-    setAddressesUnified([]);
-    setAddressesTransparent([]);
-    setValueTransferList([]);
-    setMessagesList([]);
-    setInfo(new InfoClass());
-    setZecPrice(0);
-    setSyncStatus({} as SyncStatusType);
-    setVerificationProgress(null);
-    setFetchError("", "");
-    setCurrentWalletOpenError("");
-    setSendPageState(new SendPageStateClass());
-
+    // Invalidate outstanding replies before clearing what they used to display.
     await rpcRef.current?.clearTimers();
-
+    clearWalletView();
     navigateToLoadingScreen();
-  }, [
-    navigateToLoadingScreen,
-    setTotalBalance,
-    setAddressesUnified,
-    setAddressesTransparent,
-    setValueTransferList,
-    setMessagesList,
-    setInfo,
-    setZecPrice,
-    setSyncStatus,
-    setVerificationProgress,
-    setFetchError,
-    setCurrentWalletOpenError,
-    setSendPageState,
-  ]);
+  }, [navigateToLoadingScreen, clearWalletView]);
 
   // Changing the active server means reopening the wallet. `change_server` on a
   // live client swaps the URI but leaves it unable to reach the new one, so
@@ -717,9 +718,13 @@ const AppRoutes: React.FC = () => {
   }, [openConfirmModal, handleShieldButtonConfirmed]);
 
   const runRPCRescan = useCallback(() => {
-    openConfirmModal("Rebuild wallet sync data", "This downloads the chain again and rebuilds the local transaction history. Your wallet keys, addresses and recovery phrase are kept. Balances will update as the scan completes.", async () => {
-      await rpcRef.current?.refreshSync(true);
-    });
+    openConfirmModal(
+      "Rebuild wallet sync data",
+      "This downloads the chain again and rebuilds the local transaction history. Your wallet keys, addresses and recovery phrase are kept. Balances will update as the scan completes.",
+      async () => {
+        await rpcRef.current?.refreshSync(true);
+      },
+    );
   }, [openConfirmModal]);
 
   // What the shell's Retry button runs: the ordinary sync, now, instead of at

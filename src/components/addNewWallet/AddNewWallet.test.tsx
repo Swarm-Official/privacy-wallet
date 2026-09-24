@@ -8,11 +8,7 @@ import { CreationTypeEnum, ServerChainNameEnum, ServerClass } from "../appstate"
 import { SwapStore, readCurrentWalletFingerprint } from "../../swap";
 import { useSwapService } from "../../context/ContextSwapService";
 import selectFastestServer from "../../utils/selectFastestServer";
-import {
-  SWARM_DEFAULT_SERVER,
-  SWARM_NO_AUTOMATIC_REASON,
-  SWARM_SERVER_PRESETS,
-} from "../../utils/swarmNetwork";
+import { SWARM_DEFAULT_SERVER, SWARM_NO_AUTOMATIC_REASON, SWARM_SERVER_PRESETS } from "../../utils/swarmNetwork";
 
 jest.mock("../../electronBridge");
 jest.mock("../../utils/fetchServerList");
@@ -228,7 +224,18 @@ describe("AddNewWallet on the project chain", () => {
     render(<AddNewWallet {...baseProps} />, {
       initialRoute: (state ? { pathname: "/addnewwallet", state } : "/addnewwallet") as never,
       ...(state?.mode === "settings"
-        ? { contextOverrides: { currentWallet: { id: 4, alias: "Mine", fileName: "w.dat", chain_name: SWARM, uri: OWN_NODE, selection: "custom" } as never } }
+        ? {
+            contextOverrides: {
+              currentWallet: {
+                id: 4,
+                alias: "Mine",
+                fileName: "w.dat",
+                chain_name: SWARM,
+                uri: OWN_NODE,
+                selection: "custom",
+              } as never,
+            },
+          }
         : {}),
     });
     await openServerBlock();
@@ -240,6 +247,25 @@ describe("AddNewWallet on the project chain", () => {
 
     expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER);
     expect(screen.getByLabelText("Custom server URI")).toBeEnabled();
+  });
+
+  it("waits for polling to stop before native creation resets the active wallet", async () => {
+    storedSettings();
+    (native.wallet_exists as jest.Mock).mockResolvedValue(false);
+    let stop!: () => void;
+    baseProps.clearTimers.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        stop = resolve;
+      }),
+    );
+    // Leave native creation pending so this test cannot generate a real wallet.
+    (native.init_new as jest.Mock).mockReturnValueOnce(new Promise(() => {}));
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: /create wallet/i }));
+    await waitFor(() => expect(baseProps.clearTimers).toHaveBeenCalled());
+    expect(native.init_new).not.toHaveBeenCalled();
+    stop();
+    await waitFor(() => expect(native.init_new).toHaveBeenCalledTimes(1));
   });
 
   it("does not offer Automatic, and says why", async () => {

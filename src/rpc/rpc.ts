@@ -68,6 +68,14 @@ const HEALTH_PROBE_INTERVAL_MS = 15 * 1000;
 export default class RPC {
   // A second click must not queue another payment behind a slow proof.
   private static sendInFlight = false;
+  // An asynchronous reply belongs to the wallet session that requested it.
+  // Stopping a timer alone does not stop replies already in flight.
+  private session = 0;
+  private suspended = false;
+
+  private isCurrent(session: number): boolean {
+    return session === this.session && !this.suspended;
+  }
   fnSetTotalBalance: (tb: TotalBalanceClass) => void;
   fnSetAddressesUnified: (abs: UnifiedAddressClass[]) => void;
   fnSetAddressesTransparent: (abs: TransparentAddressClass[]) => void;
@@ -162,6 +170,8 @@ export default class RPC {
    * in a row.
    */
   async probeServerHealth(): Promise<void> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     const uri: string = this.currentWallet?.uri ?? "";
     if (!uri || Date.now() - this.healthProbeAt < HEALTH_PROBE_INTERVAL_MS) {
       return;
@@ -174,6 +184,7 @@ export default class RPC {
     } catch (error) {
       console.log(`server health: ${uri} did not answer`, error);
     } finally {
+      if (!this.isCurrent(session)) return;
       const durationMs: number = Date.now() - start;
       // Logged on both outcomes and with the duration, so the probe timeout can
       // later be argued from what servers actually do.
@@ -211,6 +222,8 @@ export default class RPC {
    * refreshing. That is the whole reason this is keyed.
    */
   private async once(key: string, work: () => Promise<unknown>): Promise<void> {
+    if (this.suspended) return;
+    key = `${this.session}:${key}`;
     if (this.inFlight.has(key)) {
       return;
     }
@@ -223,6 +236,7 @@ export default class RPC {
   }
 
   async runTaskPromises(): Promise<void> {
+    if (this.suspended) return;
     await Promise.allSettled([
       this.once("syncPoll", () => this.fetchSyncPoll()),
       this.once("info", () => this.fetchInfo()),
@@ -242,13 +256,18 @@ export default class RPC {
   // The save check on the task cycle, with its failure put on screen rather
   // than left in the console. Silence here reads as "saved".
   async checkSave(): Promise<void> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     const reason = await RPC.doSave();
+    if (!this.isCurrent(session)) return;
     if (reason) {
       this.fnSetFetchError("Save", reason);
     }
   }
 
   async configure(): Promise<void> {
+    const session = this.session;
+    this.suspended = false;
     // Bring this wallet onto the session mixnet transport (ADR 0024). Main owns
     // the proxy across wallet switches, so this attaches the fresh client to the
     // already-running tunnel (or records the per-session opt-out) with no
@@ -256,21 +275,29 @@ export default class RPC {
     // switch doesn't leave the previous wallet's state on screen.
     try {
       const status = await ipcRenderer.invoke("mixnet:attach-current");
+      if (!this.isCurrent(session)) return;
       this.fnSetMixnetView(deriveMixnetView(status as RPCMixnetStatusType));
     } catch {
+      if (!this.isCurrent(session)) return;
       this.fnSetMixnetView(UNKNOWN_MIXNET_VIEW);
     }
 
     // takes a while to start
     await this.fetchTandZandOValueTransfers();
+    if (!this.isCurrent(session)) return;
     await this.fetchAddresses();
+    if (!this.isCurrent(session)) return;
     await this.fetchTotalBalance();
+    if (!this.isCurrent(session)) return;
     await this.fetchInfo();
+    if (!this.isCurrent(session)) return;
     await this.fetchTandZandOMessages();
+    if (!this.isCurrent(session)) return;
 
     // Reconcile any in-progress private migration on launch (no-op otherwise):
     // applies the safe-unattended part-state fixes zingolib recommends.
     await RPC.reconcileMigration();
+    if (!this.isCurrent(session)) return;
 
     // every 5 seconds the App update part of the data
     if (!this.updateTimerID) {
@@ -303,6 +330,9 @@ export default class RPC {
   }
 
   async clearTimers(): Promise<void> {
+    this.session += 1;
+    this.suspended = true;
+    this.lastPollSyncError = "";
     if (this.updateTimerID) {
       clearInterval(this.updateTimerID);
       this.updateTimerID = undefined;
@@ -414,8 +444,12 @@ export default class RPC {
       info.serverUri = infoJSON.server_uri;
       info.version = `${infoJSON.vendor}/${infoJSON.git_commit ? infoJSON.git_commit.substring(0, 6) : ""}/${infoJSON.version}`;
       info.zcashdVersion = "Not Available";
-      info.currencyName = info.chainName === ServerChainNameEnum.mainChainName ? "ZEC" :
-        info.chainName === ServerChainNameEnum.swarmTestnetChainName ? SWARM_TICKER : "TAZ";
+      info.currencyName =
+        info.chainName === ServerChainNameEnum.mainChainName
+          ? "ZEC"
+          : info.chainName === ServerChainNameEnum.swarmTestnetChainName
+            ? SWARM_TICKER
+            : "TAZ";
       info.solps = 0;
 
       // ZEC price lives outside InfoClass (see `getZecPrice` below) and is
@@ -542,8 +576,10 @@ export default class RPC {
   }
 
   async fetchInfo(): Promise<void> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     const info: InfoClass = await RPC.getInfoObject(!this.readOnly);
-
+    if (!this.isCurrent(session)) return;
     this.fnSetInfo(info);
   }
 
@@ -564,12 +600,15 @@ export default class RPC {
   }
 
   async fetchSyncPoll(): Promise<void> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     try {
       // A failed poll rejects (typed error on the throw channel); the catch
       // below records it and puts it on screen. Status replies ("not
       // launched", "not complete") and the completed JSON still cross on the
       // data channel.
       const returnPoll: string = await native.poll_sync();
+      if (!this.isCurrent(session)) return;
       // Reaching here at all is the sync answering, whatever it answered, so a
       // failure the user is still being shown is over.
       if (this.lastPollSyncError) {
@@ -621,6 +660,7 @@ export default class RPC {
       // clause is the one that says anything — "wallet height 34100000 is more
       // than 100 blocks ahead of best chain height 3470916" tells someone what
       // is wrong with their wallet; the four wrappers around it do not.
+      if (!this.isCurrent(session)) return;
       const reason = userFacingError(error);
       // The console is deduplicated; the banner is not. It clears itself a few
       // seconds after the last failure, so a wallet that cannot sync at all
@@ -635,10 +675,14 @@ export default class RPC {
   }
 
   async refreshSync(fullRescan?: boolean): Promise<void> {
+    let session = this.session;
+    if (!this.isCurrent(session)) return;
     try {
       // This is async, so when it is done, we finish the refresh.
       if (fullRescan) {
         await this.clearTimers();
+        session = this.session;
+        this.suspended = false;
         // clean the ValueTransfer list before.
         this.fnSetValueTransfersList([]);
         this.fnSetMessagesList([]);
@@ -661,6 +705,7 @@ export default class RPC {
         // 2. launch the rescan.
         // A failed rescan rejects (typed error on the throw channel), caught below.
         await native.run_rescan();
+        if (!this.isCurrent(session)) return;
         await this.configure();
       } else {
         // Named like the cycle's members, and dropped the same way. zingolib
@@ -681,6 +726,7 @@ export default class RPC {
         });
       }
     } catch (error) {
+      if (!this.isCurrent(session)) return;
       console.error(`Critical Error run sync/rescan ${error}`);
       // A rescan is something the user asked for and then watches. Failing it
       // in the console alone left them watching a progress bar that was never
@@ -690,9 +736,12 @@ export default class RPC {
   }
 
   async fetchSyncStatus(): Promise<void> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     try {
       // A failed status rejects (typed error on the throw channel), caught below.
       const returnStatus: string = await native.status_sync();
+      if (!this.isCurrent(session)) return;
       let ss = {} as SyncStatusType;
       try {
         ss = JSON.parse(returnStatus);
@@ -741,9 +790,12 @@ export default class RPC {
   }
 
   async zingolibValueTransfers(): Promise<RPCValueTransferType[]> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return [];
     try {
       // fetch value transfers
       const txValueTransfersStr: string = await native.get_value_transfers();
+      if (!this.isCurrent(session)) return [];
       if (!txValueTransfersStr) {
         console.error("Internal Error txs ValueTransfers");
         this.fnSetFetchError("ValueTransfers", "Internal RPC Error");
@@ -753,6 +805,7 @@ export default class RPC {
 
       return txValueTransfersJSON.value_transfers;
     } catch (error) {
+      if (!this.isCurrent(session)) return [];
       this.fnSetFetchError("ValueTransfers", `Critical Error value transfers ${error}`);
       console.error(`Critical Error value transfers ${error}`);
       return [];
@@ -760,9 +813,12 @@ export default class RPC {
   }
 
   async zingolibMessages(): Promise<RPCValueTransferType[]> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return [];
     try {
       // fetch value transfers
       const txMessagesStr: string = await native.get_messages("");
+      if (!this.isCurrent(session)) return [];
       if (!txMessagesStr) {
         console.error("Internal Error txs Messages");
         this.fnSetFetchError("Messages", "Internal RPC Error");
@@ -772,6 +828,7 @@ export default class RPC {
 
       return txMessagesJSON.value_transfers;
     } catch (error) {
+      if (!this.isCurrent(session)) return [];
       this.fnSetFetchError("Messages", `Critical Error messages ${error}`);
       console.error(`Critical Error messages ${error}`);
       return [];
@@ -780,12 +837,15 @@ export default class RPC {
 
   // This method will get the total balances
   async fetchTotalBalance() {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     try {
       // Both guards return. Falling through left `JSON.parse("")` to throw a
       // `SyntaxError: Unexpected end of JSON input`, and the catch below then
       // overwrote the message just published with that — the wallet's own
       // reason replaced by a complaint about parsing nothing.
       const spendableStr: string = await native.get_spendable_balance_total();
+      if (!this.isCurrent(session)) return;
       if (!spendableStr) {
         console.error("Internal Error spendable balance");
         this.fnSetFetchError("balance", "the wallet returned no spendable balance");
@@ -794,6 +854,7 @@ export default class RPC {
       const spendableJSON = JSON.parse(spendableStr);
 
       const balanceStr: string = await native.get_balance();
+      if (!this.isCurrent(session)) return;
       if (!balanceStr) {
         console.error("Internal Error balance");
         this.fnSetFetchError("balance", "the wallet returned no balance");
@@ -818,15 +879,19 @@ export default class RPC {
 
       this.fnSetTotalBalance(balance);
     } catch (error) {
+      if (!this.isCurrent(session)) return;
       this.fnSetFetchError("balance", userFacingError(error));
       console.error(`Critical Error balance ${error}`);
     }
   }
 
   async fetchAddresses() {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     try {
       // UNIFIED
       const unifiedAddressesStr: string = await native.get_unified_addresses();
+      if (!this.isCurrent(session)) return;
       if (!unifiedAddressesStr) {
         console.error("Internal Error addresses");
         return;
@@ -835,6 +900,7 @@ export default class RPC {
 
       // TRANSPARENT
       const transparentAddressStr: string = await native.get_transparent_addresses();
+      if (!this.isCurrent(session)) return;
       if (!transparentAddressStr) {
         console.error("Internal Error addresses");
         return;
@@ -844,6 +910,7 @@ export default class RPC {
       this.fnSetAddressesUnified(unifiedAddressesJSON);
       this.fnSetAddressesTransparent(transparentAddressesJSON);
     } catch (error) {
+      if (!this.isCurrent(session)) return;
       console.error(`Critical Error addresses ${error}`);
       // An empty Receive screen with no explanation is the failure this
       // produced; the reason belongs where the addresses should have been.
@@ -930,9 +997,12 @@ export default class RPC {
     fetcher: () => Promise<RPCValueTransferType[]>,
     setter: (list: ValueTransferClass[]) => void,
   ): Promise<void> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     try {
       let latestBlockHeight: number = 0;
       const heightStr: string = await native.get_latest_block_server(this.currentWallet ? this.currentWallet.uri : "");
+      if (!this.isCurrent(session)) return;
       if (!heightStr) {
         console.error("Internal Error server height");
       } else {
@@ -940,7 +1010,9 @@ export default class RPC {
       }
 
       const txsJSON: RPCValueTransferType[] = await fetcher();
+      if (!this.isCurrent(session)) return;
       const walletHeight: number = await RPC.fetchWalletHeight();
+      if (!this.isCurrent(session)) return;
 
       const list: ValueTransferClass[] = txsJSON.map((tx: RPCValueTransferType) => {
         const vt: ValueTransferClass = {} as ValueTransferClass;
@@ -1487,6 +1559,8 @@ export default class RPC {
   }
 
   async getZecPrice() {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     // Skip entirely on testnet / regtest: TAZ has no USD price and the UI
     // doesn't render the value anyway (BalanceBlock only shows USD when
     // currencyName === "ZEC").
@@ -1514,10 +1588,12 @@ export default class RPC {
     // because nym-proxy survived a suspend that killed its gateways.
     try {
       const resultStr: string = await native.zec_price_over_mixnet();
+      if (!this.isCurrent(session)) return;
       const resultJSON = JSON.parse(resultStr);
       this.fnSetZecPrice(resultJSON.current_price);
       this.lastPriceFailure = "";
     } catch (error) {
+      if (!this.isCurrent(session)) return;
       this.fnSetZecPrice(0);
       // Once per distinct reason rather than once per cycle: the same refusal
       // repeating every five seconds is what the silence was avoiding, and it
@@ -1545,9 +1621,14 @@ export default class RPC {
   // 5s cycle as a fallback to the main push; a failed read resolves to the
   // fail-closed unknown view rather than leaving a stale one.
   async getMixnetView(): Promise<void> {
+    const session = this.session;
+    if (!this.isCurrent(session)) return;
     try {
-      this.fnSetMixnetView(deriveMixnetView(await RPC.getMixnetStatus()));
+      const view = deriveMixnetView(await RPC.getMixnetStatus());
+      if (!this.isCurrent(session)) return;
+      this.fnSetMixnetView(view);
     } catch {
+      if (!this.isCurrent(session)) return;
       this.fnSetMixnetView(UNKNOWN_MIXNET_VIEW);
     }
   }
@@ -1565,7 +1646,14 @@ export default class RPC {
     await ipcRenderer.invoke("mixnet:disable");
   }
 
-  setCurrentWallet(cw: WalletType) {
+  setCurrentWallet(cw: WalletType | null) {
+    if (
+      this.currentWallet?.id !== cw?.id ||
+      this.currentWallet?.fileName !== cw?.fileName ||
+      this.currentWallet?.chain_name !== cw?.chain_name
+    ) {
+      void this.clearTimers();
+    }
     this.currentWallet = cw;
   }
 
