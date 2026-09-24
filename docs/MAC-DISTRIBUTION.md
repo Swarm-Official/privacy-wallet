@@ -1,4 +1,4 @@
-# Apple-silicon direct-download build
+# macOS direct-download builds
 
 This path uses the SWARM-specific wallet config, version
 `0.1.0-testnet.7`, and the pinned SDK at
@@ -33,6 +33,24 @@ node scripts/stage-nym-proxy.js --strict-rev --target aarch64-apple-darwin
 yarn script:build
 APPLE_KEYCHAIN_PROFILE=SWARM-notary node scripts/build-mac-distribution.js
 ```
+
+For an Intel package built on the same Apple-silicon Mac, install the Intel
+Rust target, build the wallet addon and pinned Nym helper for `x86_64`, then
+package with `--arch x64`:
+
+```sh
+rustup target add --toolchain 1.96.0 x86_64-apple-darwin
+yarn neon-mac-x64
+node scripts/stage-nym-proxy.js --strict-rev --target x86_64-apple-darwin
+yarn script:build
+APPLE_KEYCHAIN_PROFILE=SWARM-notary node scripts/build-mac-distribution.js --arch x64
+```
+
+The Intel output is separate at `dist-mac-signed-x64/out/`. The script checks
+every Mach-O slice in the packaged app. If the owner Mac lacks Rosetta, run the
+matching Intel CI smoke test before release and use `--skip-smoke` only to skip
+the local runtime check; signing, notarization and architecture checks still
+run. An Intel Mac or Rosetta is required to test the signed app's launch.
 
 The distribution config keeps the app ID, name, network, SDK attribution and
 licences from `configs/swarm-testnet-builder.cjs`. Electron signs the native
