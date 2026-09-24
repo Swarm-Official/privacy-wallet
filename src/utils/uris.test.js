@@ -163,3 +163,10 @@ test("a payment request without a memo carries none", async () => {
   expect(target.amount).toBe(0.25);
   expect(target.memoString).toBeUndefined();
 });
+
+// Disposable legacy wallet fixture and its canonical Orchard receiver encoding.
+test.each(["utest18z7h64gzyjgfpuch39v2dd3g766scdzc0qdsa9qj5tawzd0n6d88dl3vyyx6elk6mcemdd6wtkd3unnvutd3sdpd3jjvgs7lz4uas7rv25d26pnryp6tczmfapqze6ggdy7645kkevh8r980zxzcyj6d9dsplukx0htsym5xsqtwaka4", "swarm12flymdvahre66el73vpyej6nva55s0lhxhp97ujv7k0vrhgvdgmsfp2xtccadctpqaku2uvw8jqm4w5py66mml9yxf600eluzumd473r"])("SWARM accepts current and legacy payment addresses: %s", async (address) => {
+  const target = await parseZcashURI(`zcash:${address}?amount=1`, "swarm-testnet");
+  expect(target.address).toBe(address);
+  expect(target.amount).toBe(1);
+});

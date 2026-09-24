@@ -164,7 +164,7 @@ export const AddressesScreen: React.FC<AddressesScreenProps> = ({ addAddressBook
                 value={address}
                 spellCheck={false}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="utest1… or tm…"
+                placeholder="swarm1…, utest1… or tm…"
               />
             </div>
             <div className={styles.addContactActions}>

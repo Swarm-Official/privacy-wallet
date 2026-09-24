@@ -221,7 +221,7 @@ export const SendScreen: React.FC<SendScreenProps> = ({ sendTransaction, setSend
                 className={styles.input}
                 value={to}
                 spellCheck={false}
-                placeholder="utest1… or tm…"
+                placeholder="swarm1…, utest1… or tm…"
                 onChange={(e) => setTo(e.target.value)}
                 disabled={readOnly}
                 aria-describedby="swarm-send-to-status"

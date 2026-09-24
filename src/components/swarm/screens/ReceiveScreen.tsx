@@ -11,7 +11,7 @@ import { SWARM_TICKER } from "../../../utils/swarmNetwork";
  * plain guidance on which one to hand over.
  *
  * The mockup shows `swm1…` addresses. This network does not issue those — a
- * unified address here starts `utest1…` and a transparent one `tm…` — and a
+ * unified address here starts `swarm1…` and a transparent one `tm…` — and a
  * screen that showed an address shape the chain never produces would teach the
  * user to mistrust the real one.
  *

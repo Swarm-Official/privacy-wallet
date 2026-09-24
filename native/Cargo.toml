@@ -66,9 +66,9 @@ crate-type = ["cdylib"]
 # is recorded in sdk/swarm-sdk-pin.json, and scripts/check-swarm-sdk-pin.js
 # checks this file, the lockfile and the pinned SDK's own genesis constant
 # against it before anything is compiled.
-zingolib = { features = ["nym", "perspective"], git = "https://github.com/Swarm-Official/privacy-zingolib", rev = "dc444848582ae63c4bf9e7aa67abf2b9f2b9639b" }
-pepper-sync = { git = "https://github.com/Swarm-Official/privacy-zingolib", rev = "dc444848582ae63c4bf9e7aa67abf2b9f2b9639b" }
-zingo-netutils = { git = "https://github.com/Swarm-Official/privacy-zingolib", rev = "dc444848582ae63c4bf9e7aa67abf2b9f2b9639b" }
+zingolib = { features = ["nym", "perspective"], git = "https://github.com/Swarm-Official/privacy-zingolib", rev = "23321888779d6ebcbccad6e34bd90a570a29e669" }
+pepper-sync = { git = "https://github.com/Swarm-Official/privacy-zingolib", rev = "23321888779d6ebcbccad6e34bd90a570a29e669" }
+zingo-netutils = { git = "https://github.com/Swarm-Official/privacy-zingolib", rev = "23321888779d6ebcbccad6e34bd90a570a29e669" }
 
 # These must match zingolib's workspace versions exactly, not merely be
 # semver-compatible with them. Two versions of `zcash_keys` resolve to two
@@ -158,6 +158,8 @@ cc = "1"
 # branch's own Cargo.lock. After any float, re-pin with
 # `cargo update -p zcash_pool_migration --precise e12f1d0ff7be5e5bfd2e4bcbb8d9a863a405f031`.
 [patch.crates-io]
+zcash_address = { path = "vendor/zcash_address" }
+zcash_protocol = { path = "vendor/zcash_protocol" }
 time = { git = "https://github.com/time-rs/time", tag = "v0.3.47" }
 lightwallet-protocol = { git = "https://github.com/zingolabs/lightwallet-protocol-rust", rev = "9bdfdc77eb283f2a3d26c27100cc2ac90148cd93" }
 

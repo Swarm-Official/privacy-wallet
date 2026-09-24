@@ -207,7 +207,7 @@ export const OverviewScreen: React.FC = () => {
               className={styles.input}
               value={quickTo}
               spellCheck={false}
-              placeholder="utest1… or tm…"
+              placeholder="swarm1…, utest1… or tm…"
               onChange={(e) => setQuickTo(e.target.value)}
               disabled={!canSend}
             />

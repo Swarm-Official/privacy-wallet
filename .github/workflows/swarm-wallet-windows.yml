@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Swarm-Official/privacy-zingolib
-          ref: dc444848582ae63c4bf9e7aa67abf2b9f2b9639b
+          ref: 23321888779d6ebcbccad6e34bd90a570a29e669
           path: sdk-source
       - uses: actions/setup-node@v4
         with:
@@ -85,6 +85,10 @@ jobs:
         run: node scripts/test.js --watchAll=false --runInBand src/utils/fetchServerList.test.ts src/utils/utils.test.ts src/components/addNewWallet/AddNewWallet.test.tsx src/components/dashboard/Dashboard.test.tsx src/components/send/Send.test.tsx
       - name: Build the pinned wallet SDK adapter
         run: yarn neon-win-x64
+      - name: Verify native prefix compatibility
+        run: node scripts/check-swarm-prefix-native.js
+      - name: Verify native payment URI parsing
+        run: node scripts/test.js --watchAll=false --runInBand src/utils/uris.test.js
       - name: Check Rust dependency pins
         run: git diff --exit-code -- native/Cargo.lock
       - name: Build the matching upstream transport helper
