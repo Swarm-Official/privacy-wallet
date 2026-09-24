@@ -87,6 +87,8 @@ jobs:
         run: node scripts/generate-swapkit-secrets.js
       - name: Check the frontend types
         run: yarn tsc --noEmit
+      - name: Prevent overlapping payments and misleading cancellation
+        run: node scripts/test.js --watchAll=false --runInBand src/rpc/sendTransaction.test.ts src/components/errorModal/ErrorModal.test.tsx
       - name: Verify network, endpoint and server-selection boundaries
         run: node scripts/test.js --watchAll=false --runInBand src/utils/fetchServerList.test.ts src/utils/utils.test.ts src/components/addNewWallet/AddNewWallet.test.tsx src/components/dashboard/Dashboard.test.tsx src/components/send/Send.test.tsx
       - name: Build the pinned wallet SDK adapter

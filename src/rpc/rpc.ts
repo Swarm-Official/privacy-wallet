@@ -66,6 +66,8 @@ const isMixnetNotReady = (error: unknown): boolean => MIXNET_NOT_READY.test(Stri
 const HEALTH_PROBE_INTERVAL_MS = 15 * 1000;
 
 export default class RPC {
+  // A second click must not queue another payment behind a slow proof.
+  private static sendInFlight = false;
   fnSetTotalBalance: (tb: TotalBalanceClass) => void;
   fnSetAddressesUnified: (abs: UnifiedAddressClass[]) => void;
   fnSetAddressesTransparent: (abs: TransparentAddressClass[]) => void;
@@ -1026,6 +1028,18 @@ export default class RPC {
 
   // Send a transaction using the already constructed sendJson structure
   async sendTransaction(sendJson: Array<SendJsonToTypeType>): Promise<string> {
+    if (RPC.sendInFlight) {
+      throw new Error("A payment is already being prepared or sent. Wait for its result before trying again.");
+    }
+    RPC.sendInFlight = true;
+    try {
+      return await this.performSendTransaction(sendJson);
+    } finally {
+      RPC.sendInFlight = false;
+    }
+  }
+
+  private async performSendTransaction(sendJson: Array<SendJsonToTypeType>): Promise<string> {
     // clear the timers - Tasks.
     await this.clearTimers();
     // sending
@@ -1067,8 +1081,12 @@ export default class RPC {
       sendError = `Error: send ${error}`;
     }
 
-    // create the tasks
-    await this.configure();
+    // A refresh failure must not turn a successful broadcast into a send error.
+    try {
+      await this.configure();
+    } catch (error) {
+      this.fnSetFetchError("Refresh after payment", userFacingError(error));
+    }
 
     if (sendTxids) {
       return sendTxids;

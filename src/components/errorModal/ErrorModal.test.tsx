@@ -17,6 +17,15 @@ openModal.body = "Please try again later.";
 openModal.modalIsOpen = true;
 
 describe("ErrorModal", () => {
+  it("does not offer cancellation or close on Escape while the native payment is active", () => {
+    const closeModal = jest.fn();
+    const pending = { ...openModal, title: "Computing Transaction" };
+    render(<ErrorModal closeModal={closeModal} />, { contextOverrides: { errorModal: pending } });
+    expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Wait for a result");
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape", code: "Escape", keyCode: 27 });
+    expect(closeModal).not.toHaveBeenCalled();
+  });
   it("renders the title when open", () => {
     render(<ErrorModal closeModal={jest.fn()} />, {
       contextOverrides: { errorModal: openModal },
