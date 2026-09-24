@@ -717,7 +717,7 @@ const AppRoutes: React.FC = () => {
   }, [openConfirmModal, handleShieldButtonConfirmed]);
 
   const runRPCRescan = useCallback(() => {
-    openConfirmModal("Rescan Wallet", "Please confirm the Action", async () => {
+    openConfirmModal("Rebuild wallet sync data", "This downloads the chain again and rebuilds the local transaction history. Your wallet keys, addresses and recovery phrase are kept. Balances will update as the scan completes.", async () => {
       await rpcRef.current?.refreshSync(true);
     });
   }, [openConfirmModal]);
@@ -973,7 +973,7 @@ const AppRoutes: React.FC = () => {
                 </Routes>
               </div>
             ) : (
-              <SwarmShell onRetry={runRPCRetrySync}>
+              <SwarmShell onRetry={runRPCRetrySync} onRebuild={runRPCRescan}>
                 <Routes>
                   <Route path={routes.DASHBOARD} element={<OverviewScreen />} />
                   <Route path={routes.SETTINGS} element={<SettingsScreen />} />

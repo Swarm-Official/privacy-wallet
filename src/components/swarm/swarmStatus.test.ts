@@ -133,7 +133,14 @@ describe("plainProblem", () => {
     expect(problem?.kind).toBe("shard-tree");
     expect(problem?.retryable).toBe(false);
     expect(problem?.rebuildable).toBe(true);
-    expect(problem?.headline).toContain("corrupted");
+    expect(problem?.headline).toContain("needs rebuilding");
+  });
+
+  it("recognises the abbreviated shard-tree error reported by the owner", () => {
+    expect(plainProblem("sync: shard tree err")).toMatchObject({
+      kind: "shard-tree", retryable: false, rebuildable: true,
+      technical: "sync: shard tree err",
+    });
   });
 
   it("falls back to the server's generic name when the host is unknown", () => {

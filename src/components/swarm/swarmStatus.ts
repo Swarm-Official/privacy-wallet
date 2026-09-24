@@ -184,7 +184,7 @@ const FUNDS = ["insufficient funds", "insufficient balance", "not enough"];
 // cannot fix this — it is the wallet's own saved data, not the server's — so
 // the only useful action is to rebuild the local copy against the server.
 const SHARD_TREE = [
-  "shard tree error",
+  "shard tree err",
   "inserted root conflicts",
   "root conflicts with existing root",
 ];
@@ -227,8 +227,8 @@ export function plainProblem(raw: string | undefined | null, host?: string): Swa
   if (SHARD_TREE.some((needle) => lower.includes(needle))) {
     return {
       kind: "shard-tree",
-      headline: "Your wallet's local sync data is corrupted.",
-      body: "Your coins are safe on-chain. This wallet cannot finish syncing from the data it already has, so choose Rebuild to clear the local copy and re-sync from the server — you keep your wallet and its recovery phrase.",
+      headline: "Your wallet's local sync data needs rebuilding.",
+      body: "The saved commitment tree conflicts with the sync data. Choose Rebuild to download the chain again. Your wallet keys, addresses and recovery phrase are kept; balances update as the scan completes.",
       retryable: false,
       rebuildable: true,
       technical,

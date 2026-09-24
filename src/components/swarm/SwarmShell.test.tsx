@@ -44,12 +44,12 @@ function state(overrides: Partial<AppState>): AppState {
   } as AppState;
 }
 
-function renderShell(overrides: Partial<AppState> = {}, path: string = routes.DASHBOARD) {
+function renderShell(overrides: Partial<AppState> = {}, path: string = routes.DASHBOARD, onRebuild?: () => void) {
   return render(
     <ContextAppProvider value={state(overrides)}>
       <MemoryRouter initialEntries={[path]}>
         <SwarmUiProvider>
-          <SwarmShell onRetry={jest.fn()}>
+          <SwarmShell onRetry={jest.fn()} onRebuild={onRebuild}>
             <div>screen</div>
           </SwarmShell>
         </SwarmUiProvider>
@@ -71,6 +71,13 @@ describe("navForPath", () => {
 });
 
 describe("SwarmShell", () => {
+  it("offers the rebuild action for a shard-tree conflict and invokes it once", async () => {
+    const onRebuild = jest.fn();
+    renderShell({ syncingStatus: { lastError: "sync: shard tree err" } }, routes.DASHBOARD, onRebuild);
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Rebuild" }));
+    expect(onRebuild).toHaveBeenCalledTimes(1);
+  });
   it("offers the mockup's six destinations and no more", () => {
     renderShell();
     const rail = screen.getByRole("navigation", { name: /wallet sections/i });
