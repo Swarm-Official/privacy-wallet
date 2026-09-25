@@ -3,6 +3,8 @@
 # dependencies
 /node_modules
 /dist
+/dist-mac-signed
+/dist-mac-signed-x64/
 /.pnp
 .pnp.js
 /target
