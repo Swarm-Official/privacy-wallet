@@ -23,6 +23,8 @@ import { RPCMixnetStatusType } from "./components/RPCMixnetStatusType";
 import { deriveMixnetView, MixnetView, UNKNOWN_MIXNET_VIEW } from "./components/mixnetPresenter";
 import { userFacingError } from "../utils/userFacingError";
 import { SWARM_TICKER } from "../utils/swarmNetwork";
+import { swarmProfileFor } from "../utils/networkProfiles";
+import { ServerIdentity, ServerVerdict, checkServerIdentity } from "../utils/serverIdentity";
 import { depositSpendsSourceAddress } from "../swap/depositRouting";
 import { INITIAL_SERVER_HEALTH, ServerHealthState, recordProbe } from "./components/serverHealth";
 import {
@@ -265,6 +267,63 @@ export default class RPC {
     }
   }
 
+  /**
+   * The last answer to "is this indexer serving the chain this wallet is on?",
+   * keyed by the wallet's chain and the server it was asked about.
+   *
+   * Cached only while the answer is yes, and only for that pair: a refusal is
+   * re-asked every time, and changing either the wallet or the server throws the
+   * cache away. The sync cycle asks on every pass, and a `GetLightdInfo` round
+   * trip per pass would be a cost paid to re-learn something that cannot change
+   * without one of those two changing.
+   */
+  private serverIdentityOkFor: string = "";
+
+  /**
+   * The SWARM network this wallet is on, or `undefined` when it is on one of
+   * upstream's. Read synchronously by the two callers below so that a wallet
+   * with no SWARM profile does not pay even a microtask for a check that has
+   * nothing to check — the send path's ordering is observable, and this change
+   * must not move it.
+   */
+  private swarmProfile() {
+    return swarmProfileFor(this.currentWallet?.chain_name);
+  }
+
+  /**
+   * Whether the wallet may talk to its indexer, checked before syncing and
+   * before sending.
+   *
+   * Only SWARM chains are checked. Upstream `main`/`test`/`regtest` wallets are
+   * left exactly as they were: their servers are upstream's, this application
+   * makes no claim about them, and adding a gate there would change behaviour
+   * this change is not about.
+   */
+  async checkServer(): Promise<ServerVerdict> {
+    const profile = this.swarmProfile();
+    if (!profile) return { ok: true };
+
+    const key = `${profile.chainLabel}|${this.currentWallet?.uri ?? ""}`;
+    if (this.serverIdentityOkFor === key) return { ok: true };
+
+    let identity: ServerIdentity | null = null;
+    try {
+      const infostr: string = await native.info_server();
+      identity = infostr ? (JSON.parse(infostr) as ServerIdentity) : null;
+    } catch (error) {
+      // An unreachable or unparseable server is not a wrong server, and the
+      // existing unreachability surfaces already say so. Saying "wrong chain"
+      // here would accuse a server that has not answered at all.
+      console.error(`Server identity check could not read the server: ${error}`);
+      return { ok: true };
+    }
+    if (identity === null) return { ok: true };
+
+    const verdict = checkServerIdentity(profile, identity);
+    this.serverIdentityOkFor = verdict.ok ? key : "";
+    return verdict;
+  }
+
   async configure(): Promise<void> {
     const session = this.session;
     this.suspended = false;
@@ -447,7 +506,7 @@ export default class RPC {
       info.currencyName =
         info.chainName === ServerChainNameEnum.mainChainName
           ? "ZEC"
-          : info.chainName === ServerChainNameEnum.swarmTestnetChainName
+          : swarmProfileFor(info.chainName)
             ? SWARM_TICKER
             : "TAZ";
       info.solps = 0;
@@ -677,6 +736,17 @@ export default class RPC {
   async refreshSync(fullRescan?: boolean): Promise<void> {
     let session = this.session;
     if (!this.isCurrent(session)) return;
+    // Before a single block is scanned. A wallet that syncs against the wrong
+    // chain writes that chain's state into this wallet file, and no later check
+    // can take it back out.
+    if (this.swarmProfile()) {
+      const serverVerdict = await this.checkServer();
+      if (!this.isCurrent(session)) return;
+      if (!serverVerdict.ok) {
+        this.fnSetFetchError(fullRescan ? "Rescan" : "Sync", serverVerdict.message);
+        return;
+      }
+    }
     try {
       // This is async, so when it is done, we finish the refresh.
       if (fullRescan) {
@@ -1112,6 +1182,15 @@ export default class RPC {
   }
 
   private async performSendTransaction(sendJson: Array<SendJsonToTypeType>): Promise<string> {
+    // The irreversible one. A transaction built against the wrong chain's
+    // consensus rules and broadcast there is not a mistake the user can undo,
+    // so the server is re-checked here rather than trusted from the sync path.
+    if (this.swarmProfile()) {
+      const serverVerdict = await this.checkServer();
+      if (!serverVerdict.ok) {
+        throw new Error(serverVerdict.message);
+      }
+    }
     // clear the timers - Tasks.
     await this.clearTimers();
     // sending
@@ -1654,6 +1733,9 @@ export default class RPC {
     ) {
       void this.clearTimers();
     }
+    // A different wallet, a different server, or a different chain: the cached
+    // "this server is the right one" answer was about the old pair.
+    this.serverIdentityOkFor = "";
     this.currentWallet = cw;
   }
 

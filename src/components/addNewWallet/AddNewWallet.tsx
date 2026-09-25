@@ -24,6 +24,7 @@ import {
   swarmPresetFor,
   swarmUnreachableMessage,
 } from "../../utils/swarmNetwork";
+import { SWARM_MAINNET_PROFILE } from "../../utils/networkProfiles";
 import { native, ipcRenderer } from "../../electronBridge";
 import { useLocation } from "react-router-dom";
 import ScrollPaneTop from "../scrollPane/ScrollPane";
@@ -130,11 +131,16 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
     file: "Restore Wallet from an existent DAT file",
   };
 
-  const activationHeight = {
+  // Every chain the app can name, so adding one cannot silently leave a wallet
+  // with an `undefined` birthday. SWARM production's height is its profile's;
+  // the profile is not selectable in this build, so the entry is here to keep
+  // the map total rather than because a screen can reach it.
+  const activationHeight: Record<ServerChainNameEnum | "", number> = {
     main: 419200,
     test: 280000,
     regtest: 1,
     "swarm-testnet": SWARM_ACTIVATION_HEIGHT,
+    "swarm-mainnet": SWARM_MAINNET_PROFILE.activationHeight,
     "": 1,
   };
 
@@ -476,8 +482,10 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       }
       const effectiveChain = selectedChain ? selectedChain : ServerChainNameEnum.mainChainName;
       if (!Utils.sameAddressNetwork(parsed.chain_name, effectiveChain)) {
-        const friendly = (c: string | undefined) =>
-          c === "main" ? "mainnet" : c === "test" ? "testnet" : c === "regtest" ? "regtest" : c;
+        // Through the one naming function, so a SWARM chain is named "SWARM
+        // Testnet"/"SWARM Mainnet" here rather than printed as its raw label —
+        // and so upstream's "mainnet" can never be the word a SWARM user reads.
+        const friendly = (c: string | undefined) => Utils.chainDisplayName(c) || c;
         openErrorModal(
           "Parsing UFVK",
           `This Unified Full Viewing Key is for ${friendly(parsed.chain_name)}, ` +

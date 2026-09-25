@@ -548,11 +548,39 @@ fn construct_uri_load_config(
     let lightwalletd_uri = construct_indexer_uri(uri.clone())
         .map_err(|e| ZingolibError::Init(format!("Invalid server uri: {e}")))?;
 
+    // The chain hint, which is the single string that decides which network a
+    // wallet is opened on.
+    //
+    // `"main"` is upstream Zcash and nothing else. The SWARM production network
+    // is `swarm-mainnet`, it is a different `ChainType` in the SDK, and it
+    // carries the genesis hash it launched from — so its hint is
+    // `swarm-mainnet:<64 hex characters>`, never the bare label. The SDK
+    // revision this crate is pinned at (see native/Cargo.toml and
+    // sdk/swarm-sdk-pin.json) predates `ChainType::SwarmMainnet`, so the arm
+    // below refuses the hint outright and says why, rather than letting it fall
+    // into the catch-all where it would read as a typo. When the pin moves to a
+    // revision that has the variant, this arm becomes:
+    //
+    //     hint if hint.starts_with(SWARM_MAINNET_PREFIX) => ChainType::SwarmMainnet(
+    //         SwarmMainnetGenesis::from_display_hex(&hint[SWARM_MAINNET_PREFIX.len()..])
+    //             .map_err(|e| ZingolibError::Init(e.to_string()))?,
+    //     ),
+    //
+    // and the refusal below goes away with it. What must not change either way
+    // is that no spelling of "mainnet" reaches `ChainType::Mainnet` except the
+    // exact string `"main"`.
+    const SWARM_MAINNET_LABEL: &str = "swarm-mainnet";
     let chaintype = match chain_hint.as_str() {
         "main" => ChainType::Mainnet,
         "test" => ChainType::Testnet,
         "regtest" => ChainType::Regtest(ActivationHeights::default()),
         "swarm-testnet" => ChainType::CustomTestnet,
+        hint if hint == SWARM_MAINNET_LABEL || hint.starts_with(&format!("{SWARM_MAINNET_LABEL}:")) => {
+            return Err(ZingolibError::Init(
+                "The SWARM production network is not available in this build: its wallet SDK has no                  SWARM production profile yet, and this application will not open a production                  wallet against upstream Zcash's."
+                    .to_string(),
+            ));
+        }
         _ => return Err(ZingolibError::Init("Not a valid chain hint!".to_string())),
     };
     let performancetype = match performance_level.as_str() {

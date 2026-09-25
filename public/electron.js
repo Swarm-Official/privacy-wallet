@@ -64,6 +64,30 @@ const SWARM_WINDOW_TITLE = "SWARM Wallet (Testnet)";
 // exists because the main process runs before any renderer module is loaded.
 const SWARM_CHAIN_NAME = "swarm-testnet";
 
+// SWARM production. Named here so this file can refuse it, not so it can select
+// it: the network has no genesis until its launch ceremony, this build ships no
+// hash for it, and a wallet that cannot name a chain's first block cannot tell
+// that chain's indexer from any other. The renderer holds the same rule in
+// src/utils/networkProfiles.ts, where it is the single source; this copy exists
+// for the same reason SWARM_CHAIN_NAME's does — the main process runs before any
+// renderer module is loaded.
+//
+// Note what is NOT here: "main". That label is upstream Zcash in the SDK, in the
+// vendored address crates and in the addon, and no SWARM network may reach it.
+const SWARM_MAINNET_CHAIN_NAME = "swarm-mainnet";
+const SELECTABLE_SWARM_CHAINS = [SWARM_CHAIN_NAME];
+
+// The chain a stored setting is allowed to boot on. A settings file survives
+// downgrades and hand-editing, so a label this build cannot serve is replaced by
+// the one it can rather than carried into the wallet.
+const selectableChainOrFallback = (chain) => {
+  if (chain === SWARM_MAINNET_CHAIN_NAME && !SELECTABLE_SWARM_CHAINS.includes(chain)) {
+    console.log(`[network] ${chain} is not available in this build; falling back to ${SWARM_CHAIN_NAME}`);
+    return SWARM_CHAIN_NAME;
+  }
+  return chain;
+};
+
 // The project's official channels, and the only destinations this application
 // offers to open. Upstream's were ZingoLabs'; a user following a link out of
 // this wallet must not end up somewhere that has never heard of this network.
@@ -84,6 +108,13 @@ if (isSwarmWalletBuild && !settings.getSync("all")) {
     serverselection: "custom",
     currentwalletid: null,
   });
+} else if (isSwarmWalletBuild) {
+  const stored = settings.getSync("all.serverchain_name");
+  const allowed = selectableChainOrFallback(stored);
+  if (allowed !== stored) {
+    settings.setSync("all.serverchain_name", allowed);
+    settings.setSync("all.serveruri", SWARM_DEFAULT_SERVER);
+  }
 }
 
 // Is the main process's event loop the thing that stalls?

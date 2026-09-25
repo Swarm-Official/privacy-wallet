@@ -11,6 +11,8 @@ import randomColor from "randomcolor";
 import { native, shell } from "../electronBridge";
 import { ServerChainNameEnum } from "../components/appstate";
 import { SWARM_NETWORK_LABEL } from "./swarmNetwork";
+import { SWARM_MAINNET_PROFILE, swarmProfileFor } from "./networkProfiles";
+import { checkAddressForChain } from "./swarmAddress";
 
 export const NO_CONNECTION: string = "Could not connect to the Server";
 
@@ -127,6 +129,14 @@ export default class Utils {
 
   static async getAddressKind(addr: string, currChain: "" | ServerChainNameEnum): Promise<AddressKindEnum | undefined> {
     if (!addr) return;
+    // The SWARM rule, ahead of the addon, because the addon cannot answer this
+    // one. Its vendored protocol crate gives the TESTNET constants SwarmTestnet's
+    // HRPs, so `swarm1…` decodes as chain `test` and `sameAddressNetwork` below
+    // treats that as SwarmTestnet on purpose. That aliasing must not reach SWARM
+    // production: a SwarmTestnet address offered to a production wallet has to be
+    // refused by its encoding, which is what this does. See utils/swarmAddress.ts.
+    const swarmVerdict = Utils.addressVerdict(addr, currChain);
+    if (swarmVerdict && !swarmVerdict.accepted) return;
     try {
       const resultParse: string = await native.parse_address(addr);
       if (!resultParse) {
@@ -166,8 +176,30 @@ export default class Utils {
    * can drop it straight into JSX without a guard.
    */
   static sameAddressNetwork(encodedNetwork: string | undefined, selectedNetwork: string): boolean {
+    // The one alias, and it is deliberate: this build's vendored protocol crate
+    // renamed upstream TESTNET's unified HRP to SwarmTestnet's, so the addon
+    // reports `test` for an address a SwarmTestnet user typed. There is no
+    // second alias. SWARM production is its own network type in the SDK and
+    // reports its own label; `main` is upstream Zcash and satisfies nothing here.
     return encodedNetwork === selectedNetwork ||
       (selectedNetwork === ServerChainNameEnum.swarmTestnetChainName && encodedNetwork === ServerChainNameEnum.testChainName);
+  }
+
+  /**
+   * What the SWARM address rules say about `addr` on `chain`, or `undefined`
+   * when `chain` is not a SWARM network and the rules have no opinion.
+   */
+  static addressVerdict(addr: string, chain: "" | ServerChainNameEnum | undefined) {
+    return checkAddressForChain(addr, chain || undefined);
+  }
+
+  /**
+   * Why an address cannot be paid on `chain`, in one sentence a user can act
+   * on, or "" when it can. Screens show this instead of a bare "invalid".
+   */
+  static addressRefusal(addr: string, chain: "" | ServerChainNameEnum | undefined): string {
+    const verdict = Utils.addressVerdict(addr, chain);
+    return verdict && !verdict.accepted ? verdict.message : "";
   }
 
   static chainDisplayName(chain: string | undefined): string {
@@ -180,6 +212,8 @@ export default class Utils {
         return "Regtest";
       case ServerChainNameEnum.swarmTestnetChainName:
         return SWARM_NETWORK_LABEL;
+      case ServerChainNameEnum.swarmMainnetChainName:
+        return SWARM_MAINNET_PROFILE.displayName;
       default:
         return "";
     }
@@ -193,6 +227,17 @@ export default class Utils {
    */
   static async detectAddressChain(addr: string): Promise<ServerChainNameEnum | null> {
     if (!addr) return null;
+    // A SWARM encoding names its own chain and is never probed against the
+    // upstream list below, where `swarm1…` would come back as `test`.
+    for (const profile of [SWARM_MAINNET_PROFILE, swarmProfileFor(ServerChainNameEnum.swarmTestnetChainName)]) {
+      if (profile && checkAddressForChain(addr, profile.chainLabel)?.accepted) {
+        // Only the encodings that are this profile's alone. SwarmTestnet shares
+        // `utest1…`/`tm…`/`t2…` with upstream testnet, so those keep falling
+        // through to the probe below and keep answering `test`, as they always
+        // have.
+        if (profile.distinctivePrefixes.some((prefix) => addr.startsWith(prefix))) return profile.chainLabel;
+      }
+    }
     const chains: ServerChainNameEnum[] = [
       ServerChainNameEnum.mainChainName,
       ServerChainNameEnum.testChainName,
