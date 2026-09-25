@@ -1,10 +1,13 @@
 {
   "repository": "https://github.com/Swarm-Official/privacy-zingolib",
-  "branch": "codex/swarm-prefix-sdk",
-  "commit": "ef08aa252ec55f411dc937045548cd4f3f3dc664",
+  "branch": "codex/mainnet-sdk-identity-20260925",
+  "commit": "d9f1a5b888067724b61b2fae46307ed56b4b1e0a",
+  "commitIsPushed": false,
+  "commitNote": "d9f1a5b8 exists only on the local branch codex/mainnet-sdk-identity-20260925, in the SDK worktree C:/Users/o5o-o/swarm-work/codex-mainnet-sdk-identity-20260925. It has NOT been pushed to the repository named above. Until it is, `cargo fetch` cannot resolve this revision and no build of the native addon — local or CI — can start. Push the SDK branch first, then build. Its parent ef08aa252ec55f411dc937045548cd4f3f3dc664 is the last pushed revision and is what this file named before.",
   "chainName": "swarm-testnet",
   "genesis": "045993f5c91ea160c7ebda573dd97b0016816bca68d395bfff202779b88e2a28",
   "genesisIsPlaceholder": false,
+  "chainNameNote": "chainName and genesis are SwarmTestnet's, and stay SwarmTestnet's: scripts/check-swarm-sdk-pin.js reads SWARM_TESTNET_NAME and SWARM_TESTNET_GENESIS out of the pinned SDK's zingolib/src/config.rs, and d9f1a5b8 leaves both constants exactly as ef08aa25 left them. SWARM production is a separate profile in that same revision — ChainType::SwarmMainnet(SwarmMainnetGenesis) — and deliberately has no genesis constant to pin: its genesis is supplied per wallet through the `swarm-mainnet:<64 hex>` chain hint. There is nothing here for this file to record until the launch ceremony produces one.",
   "manifest": {
     "source": "network/swarm-testnet/manifest.json in the project repository",
     "schema": "swarm-network-manifest/1",
@@ -18,11 +21,13 @@
     "reproductions": 2,
     "note": "Copied from the manifest so the build can check itself against it. The manifest is not in this repository; scripts/check-swarm-sdk-pin.js --manifest <path> re-reads the authoritative file when it is available, enforcing the fields that decide which chain this is and only noting drift in the generator's bookkeeping."
   },
-  "status": "SwarmTestnet development build against the final genesis, whose block is stamped in the past so the chain can produce block 1 immediately. Unsigned, not a release, and no wallet safety claim.",
+  "status": "SwarmTestnet development build against the final genesis, whose block is stamped in the past so the chain can produce block 1 immediately, now carrying the SWARM production profile as well. Unsigned, not a release, and no wallet safety claim. This pin has NOT been compiled: the addon that consumes it was authored without cargo (see native/BUILD-NOTES-MAINNET.md).",
   "verified": [
-    "SDK rollback and compatibility CI passed: https://github.com/Swarm-Official/privacy-zingolib/actions/runs/35994451073",
+    "SDK rollback and compatibility CI passed at ef08aa25: https://github.com/Swarm-Official/privacy-zingolib/actions/runs/35994451073",
     "Same-height reorg regression: fails before correction, passes after; 120 sync tests passed, 4 existing ignored",
     "Local feature sweep passed 25 combinations across pepper-sync, zingolib and CLI",
-    "Encoding proof CI 35938381018: 2304 fixtures per protocol version, including client 0.10.5"
+    "Encoding proof CI 35938381018: 2304 fixtures per protocol version, including client 0.10.5",
+    "d9f1a5b8 on the build host: zcash_protocol 43 passed, zcash_address 39 unit + 9 doc, zcash_transparent 9, zcash_primitives 54, zingolib --lib 508 passed, cargo check --workspace --tests clean",
+    "NOT verified here: the native addon in this repository has not been compiled against d9f1a5b8. See native/BUILD-NOTES-MAINNET.md."
   ]
 }

@@ -531,6 +531,121 @@ fn neon_start_security_scoped_access(mut cx: FunctionContext) -> JsResult<JsObje
     }
 }
 
+/// The chain hint, which is the single string that decides which network a
+/// wallet is opened on.
+///
+/// `"main"` is upstream Zcash and nothing else. The SWARM production network is
+/// `swarm-mainnet`, it is a different `ChainType` in the SDK, and it carries the
+/// genesis hash it launched from — so its hint is `swarm-mainnet:<64 lowercase
+/// hex characters>`, never the bare label. The bare label is refused here for
+/// the same reason the SDK refuses `ChainType::try_from("swarm-mainnet")`: a
+/// name cannot supply a genesis, and a wallet that scanned the wrong chain would
+/// write its state back over the right one.
+///
+/// What must not change is that no spelling of "mainnet" reaches
+/// `ChainType::Mainnet` except the exact string `"main"`.
+fn chain_type_from_hint(chain_hint: &str) -> Result<ChainType, ZingolibError> {
+    // Taken from the SDK rather than spelled again here, so the label the wallet
+    // accepts and the label the SDK prints for the profile cannot drift apart.
+    const SWARM_MAINNET_LABEL: &str = zingolib::config::SWARM_MAINNET_NAME;
+
+    Ok(match chain_hint {
+        "main" => ChainType::Mainnet,
+        "test" => ChainType::Testnet,
+        "regtest" => ChainType::Regtest(ActivationHeights::default()),
+        "swarm-testnet" => ChainType::CustomTestnet,
+        // Anything beginning with the production label is answered here and not
+        // in the catch-all, so a malformed production hint says what is wrong
+        // with it instead of reading as a typo for some other chain.
+        hint if hint.starts_with(SWARM_MAINNET_LABEL) => {
+            let genesis = hint
+                .strip_prefix(SWARM_MAINNET_LABEL)
+                .and_then(|rest| rest.strip_prefix(':'))
+                .ok_or_else(|| {
+                    ZingolibError::Init(format!(
+                        "'{hint}' does not name a network. The SWARM production network is opened \
+                         as '{SWARM_MAINNET_LABEL}:<genesis>', where <genesis> is the 64 lowercase \
+                         hexadecimal characters of the block hash the network launched from, in the \
+                         order a node prints it. The label on its own cannot say which chain it \
+                         means."
+                    ))
+                })?;
+            ChainType::SwarmMainnet(
+                zingolib::config::SwarmMainnetGenesis::from_display_hex(genesis).map_err(|e| {
+                    ZingolibError::Init(format!("Not a valid '{SWARM_MAINNET_LABEL}' chain hint: {e}"))
+                })?,
+            )
+        }
+        _ => return Err(ZingolibError::Init("Not a valid chain hint!".to_string())),
+    })
+}
+
+#[cfg(test)]
+mod chain_hint_tests {
+    use super::chain_type_from_hint;
+    use zcash_protocol::consensus::{NetworkType, Parameters};
+    use zingolib::config::ChainType;
+
+    // Stands in for the hash the launch ceremony will produce. Written out, not
+    // derived, so a reader can see that the profile is built from a value.
+    const CEREMONY: &str = "00d4b1cb01d6bd2d1a3a4a49bba6fd0a4c2e2f7c0d6e5b4a39281706f5e4d3c2";
+
+    #[test]
+    fn the_established_hints_keep_their_meanings() {
+        assert_eq!(chain_type_from_hint("main").unwrap(), ChainType::Mainnet);
+        assert_eq!(chain_type_from_hint("test").unwrap(), ChainType::Testnet);
+        assert_eq!(
+            chain_type_from_hint("swarm-testnet").unwrap(),
+            ChainType::CustomTestnet,
+        );
+        assert!(matches!(
+            chain_type_from_hint("regtest").unwrap(),
+            ChainType::Regtest(_),
+        ));
+    }
+
+    // The assertion that stands between a SWARM payment and a Zcash signature.
+    #[test]
+    fn a_production_hint_carries_the_genesis_it_names() {
+        let chain = chain_type_from_hint(&format!("swarm-mainnet:{CEREMONY}")).unwrap();
+        assert_eq!(chain.network_type(), NetworkType::SwarmMain);
+        assert_eq!(chain.to_string(), "swarm-mainnet");
+        match chain {
+            ChainType::SwarmMainnet(genesis) => assert_eq!(genesis.to_display_hex(), CEREMONY),
+            other => panic!("{other} is not the SWARM production profile"),
+        }
+        // Two ceremonies, two chains.
+        let other = chain_type_from_hint(&format!("swarm-mainnet:{}", "ab".repeat(32))).unwrap();
+        assert_ne!(chain, other);
+    }
+
+    #[test]
+    fn the_bare_label_and_a_malformed_genesis_are_both_refused() {
+        // Every element is a `String` so the array has one element type; a mix
+        // of literals and `&format!(..)` leans on a coercion that is easy to
+        // break and hard to read.
+        for refused in [
+            "swarm-mainnet".to_string(),
+            "swarm-mainnet:".to_string(),
+            "swarm-mainnet:0".to_string(),
+            format!("swarm-mainnet:{}", &CEREMONY[..62]),
+            format!("swarm-mainnet:{CEREMONY}00"),
+            format!("swarm-mainnet:{}", CEREMONY.to_uppercase()),
+            format!("swarm-mainnet:{}", "z".repeat(64)),
+            format!("swarm-mainnet-{CEREMONY}"),
+            format!("swarm-mainnetx:{CEREMONY}"),
+            "mainnet".to_string(),
+            "swarm".to_string(),
+            String::new(),
+        ] {
+            assert!(
+                chain_type_from_hint(&refused).is_err(),
+                "'{refused}' must not open a wallet",
+            );
+        }
+    }
+}
+
 // Builds the pieces shared by every wallet-construction entry point: a
 // `ClientConfigBuilder` primed with chain type, wallet dir/name and (unless
 // Offline) the indexer URI, plus the resolved `WalletSettings` and the parsed
@@ -548,41 +663,7 @@ fn construct_uri_load_config(
     let lightwalletd_uri = construct_indexer_uri(uri.clone())
         .map_err(|e| ZingolibError::Init(format!("Invalid server uri: {e}")))?;
 
-    // The chain hint, which is the single string that decides which network a
-    // wallet is opened on.
-    //
-    // `"main"` is upstream Zcash and nothing else. The SWARM production network
-    // is `swarm-mainnet`, it is a different `ChainType` in the SDK, and it
-    // carries the genesis hash it launched from — so its hint is
-    // `swarm-mainnet:<64 hex characters>`, never the bare label. The SDK
-    // revision this crate is pinned at (see native/Cargo.toml and
-    // sdk/swarm-sdk-pin.json) predates `ChainType::SwarmMainnet`, so the arm
-    // below refuses the hint outright and says why, rather than letting it fall
-    // into the catch-all where it would read as a typo. When the pin moves to a
-    // revision that has the variant, this arm becomes:
-    //
-    //     hint if hint.starts_with(SWARM_MAINNET_PREFIX) => ChainType::SwarmMainnet(
-    //         SwarmMainnetGenesis::from_display_hex(&hint[SWARM_MAINNET_PREFIX.len()..])
-    //             .map_err(|e| ZingolibError::Init(e.to_string()))?,
-    //     ),
-    //
-    // and the refusal below goes away with it. What must not change either way
-    // is that no spelling of "mainnet" reaches `ChainType::Mainnet` except the
-    // exact string `"main"`.
-    const SWARM_MAINNET_LABEL: &str = "swarm-mainnet";
-    let chaintype = match chain_hint.as_str() {
-        "main" => ChainType::Mainnet,
-        "test" => ChainType::Testnet,
-        "regtest" => ChainType::Regtest(ActivationHeights::default()),
-        "swarm-testnet" => ChainType::CustomTestnet,
-        hint if hint == SWARM_MAINNET_LABEL || hint.starts_with(&format!("{SWARM_MAINNET_LABEL}:")) => {
-            return Err(ZingolibError::Init(
-                "The SWARM production network is not available in this build: its wallet SDK has no                  SWARM production profile yet, and this application will not open a production                  wallet against upstream Zcash's."
-                    .to_string(),
-            ));
-        }
-        _ => return Err(ZingolibError::Init("Not a valid chain hint!".to_string())),
-    };
+    let chaintype = chain_type_from_hint(&chain_hint)?;
     let performancetype = match performance_level.as_str() {
         "Maximum" => PerformanceLevel::Maximum,
         "High" => PerformanceLevel::High,
@@ -595,6 +676,11 @@ fn construct_uri_load_config(
             ChainType::Testnet => { dir.push("testnet3"); dir }
             ChainType::Regtest(_) => { dir.push("regtest"); dir }
             ChainType::CustomTestnet => { dir.push("swarm-testnet"); dir }
+            // The same directory name the SDK's own `wallet_dir_or_default`
+            // chooses for this profile. All SWARM production wallets share it:
+            // the genesis distinguishes chains, not directories, and a wallet
+            // file records its own chain and refuses to open against another.
+            ChainType::SwarmMainnet(_) => { dir.push("swarm-mainnet"); dir }
             ChainType::Mainnet => dir,
         }
     });
@@ -1567,6 +1653,14 @@ fn parse_address(mut cx: FunctionContext) -> JsResult<JsPromise> {
                         ChainType::Testnet => "test",
                         ChainType::Regtest(_) => "regtest",
                         ChainType::CustomTestnet => "swarm-testnet",
+                        // Unreachable: `make_decoded_chain_pair` above tries
+                        // three chains and this is not one of them, because
+                        // building it needs a genesis hash that an address
+                        // string does not carry. The arm exists so that the
+                        // match stays exhaustive over `ChainType` rather than
+                        // being closed with a wildcard that would quietly
+                        // mislabel a future variant.
+                        ChainType::SwarmMainnet(_) => "swarm-mainnet",
                     };
                     match recipient_address {
                         Address::Sapling(_) => Ok(object! {
@@ -1674,6 +1768,13 @@ fn parse_ufvk(mut cx: FunctionContext) -> JsResult<JsPromise> {
                                     NetworkType::Main => "main",
                                     NetworkType::Test => "test",
                                     NetworkType::Regtest => "regtest",
+                                    // Reachable: a `uviewswm1…` key decodes to
+                                    // the SWARM production network type, and it
+                                    // must be named as itself and never folded
+                                    // into "main". The label matches the chain
+                                    // hint's, minus the genesis — a viewing key
+                                    // does not carry one.
+                                    NetworkType::SwarmMain => "swarm-mainnet",
                                 },
                                 "address_kind" => "ufvk",
                                 "pools_available" => pools_available,
