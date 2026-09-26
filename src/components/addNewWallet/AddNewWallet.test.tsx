@@ -4,11 +4,11 @@ import { render } from "../../test-utils";
 import AddNewWallet from "./AddNewWallet";
 import { ipcRenderer, native } from "../../electronBridge";
 import fetchServerList from "../../utils/fetchServerList";
-import { CreationTypeEnum, ServerChainNameEnum, ServerClass } from "../appstate";
+import { CreationTypeEnum, ServerChainNameEnum } from "../appstate";
 import { SwapStore, readCurrentWalletFingerprint } from "../../swap";
 import { useSwapService } from "../../context/ContextSwapService";
 import selectFastestServer from "../../utils/selectFastestServer";
-import { SWARM_DEFAULT_SERVER, SWARM_NO_AUTOMATIC_REASON, SWARM_SERVER_PRESETS } from "../../utils/swarmNetwork";
+import { SWARM_NO_AUTOMATIC_REASON, SWARM_SERVER_PRESETS, swarmDefaultServerFor } from "../../utils/swarmNetwork";
 
 jest.mock("../../electronBridge");
 jest.mock("../../utils/fetchServerList");
@@ -34,14 +34,6 @@ jest.mock("../../utils/selectFastestServer", () => ({
 const mockSettings = { serveruri: "", serverchain_name: "main", serverselection: "" };
 
 const liveList = fetchServerList as jest.MockedFunction<typeof fetchServerList>;
-
-const liveServer = (uri: string, chain = ServerChainNameEnum.mainChainName): ServerClass => ({
-  uri,
-  chain_name: chain,
-  latency: null,
-  default: false,
-  obsolete: false,
-});
 
 const probe = selectFastestServer as jest.MockedFunction<typeof selectFastestServer>;
 
@@ -107,95 +99,65 @@ describe("AddNewWallet modes", () => {
   });
 });
 
-describe("AddNewWallet server picker", () => {
-  // The server block only appears once the settings read has resolved a chain.
-  const openPicker = async () => {
+describe("AddNewWallet offers SWARM's networks and nothing else", () => {
+  // The whole of this describe replaces three tests that asserted upstream
+  // Zcash's server picker worked. It did work, and that was the defect: on
+  // 2026-09-26 an owner picked "Mainnet", took a server off that list, pressed
+  // Create and got a real Zcash mainnet wallet with a `u1…` receive address.
+  const openServerBlock = async () => fireEvent.click((await screen.findAllByText("Selected Server"))[0]);
+
+  const openScreen = async () => {
     render(<AddNewWallet {...baseProps} />, { initialRoute: "/addnewwallet" });
-    fireEvent.click((await screen.findAllByText("Selected Server"))[0]);
-    return screen.findByLabelText("Server list");
+    await openServerBlock();
   };
 
-  it("offers the registry's servers when it answers", async () => {
-    liveList.mockImplementation(async (chain) =>
-      chain === ServerChainNameEnum.mainChainName ? [liveServer("https://one.zec.rocks:443")] : [],
-    );
+  it("offers the two SWARM networks in the Network picker, and no Zcash chain", async () => {
+    await openScreen();
+    const network = screen.getByRole("combobox", { name: /network/i });
 
-    const select = await openPicker();
-
-    expect(await within(select).findByRole("option", { name: /one\.zec\.rocks/ })).toBeInTheDocument();
-    // the static mainnet entries gave way to the live ones
-    expect(within(select).queryByRole("option", { name: /na\.zec\.rocks/ })).toBeNull();
+    expect(within(network).getByRole("option", { name: "SWARM Mainnet" })).toBeInTheDocument();
+    expect(within(network).getByRole("option", { name: /SWARM Testnet/ })).toBeInTheDocument();
+    const values = within(network)
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value)
+      .filter((v) => v !== "");
+    expect(values.sort()).toEqual(["swarm-mainnet", "swarm-testnet"]);
   });
 
-  it("keeps the static list for a chain the registry says nothing about", async () => {
-    const select = await openPicker();
+  it("has no upstream server list at all", async () => {
+    await openScreen();
 
-    expect(await within(select).findByRole("option", { name: "https://zec.rocks:443 - Mainnet" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Server list")).toBeNull();
+    expect(screen.queryByRole("radio", { name: "From the list" })).toBeNull();
   });
 
-  it("labels an entry with its URI and chain", async () => {
-    liveList.mockImplementation(async (chain) =>
-      chain === ServerChainNameEnum.mainChainName ? [liveServer("https://one.zec.rocks:443")] : [],
-    );
+  it("never asks the public lightwalletd registry for anything", async () => {
+    await openScreen();
 
-    const select = await openPicker();
-    const option = await within(select).findByRole("option", { name: /one\.zec\.rocks/ });
+    await screen.findByLabelText("Custom server URI");
+    expect(liveList).not.toHaveBeenCalled();
+  });
 
-    expect(option.textContent).toBe("https://one.zec.rocks:443 - Mainnet");
+  it("offers no endpoint belonging to upstream Zcash", async () => {
+    await openScreen();
+    const presets = await screen.findByRole("combobox", { name: /swarm server/i });
+
+    for (const option of within(presets).getAllByRole("option")) {
+      expect((option as HTMLOptionElement).value).not.toMatch(/zec\.rocks|lightwalletd\.com|zcash-infra\.com/i);
+    }
   });
 });
 
-describe("AddNewWallet automatic server", () => {
-  // The block starts collapsed, and only appears once the settings read has
-  // resolved a chain — so opening it is an await, as it is for the picker above.
-  const openServerBlock = async () => fireEvent.click((await screen.findAllByText("Selected Server"))[0]);
-
-  // It was hidden outside settings, so a new wallet could never be created on
-  // Automatic — even though the code stored exactly that when nothing was
-  // picked, and the validation then refused to let that happen.
-  it("offers Automatic while creating a wallet", async () => {
+describe("AddNewWallet never offers Automatic", () => {
+  // Automatic resolves through the public registry, which has nothing for
+  // either SWARM network by design. It used to be offered on upstream's chains
+  // — the chains that are gone — so there is nowhere left for it to appear.
+  it("offers no Automatic radio and says why", async () => {
     render(<AddNewWallet {...baseProps} />, { initialRoute: "/addnewwallet" });
-    await openServerBlock();
+    fireEvent.click((await screen.findAllByText("Selected Server"))[0]);
 
-    expect(screen.getByRole("radio", { name: "Automatic" })).toBeInTheDocument();
-  });
-
-  // The case that needed care. `init_new` dials the chosen server to build the
-  // wallet, so Automatic has to resolve one for the chain being created —
-  // never the app's saved URI, which belongs to whatever chain it was last on.
-  it("resolves a server for the chain being created, not the one last used", async () => {
-    liveList.mockResolvedValue([liveServer("https://testnet.example:443", ServerChainNameEnum.testChainName)]);
-    render(<AddNewWallet {...baseProps} />, { initialRoute: "/addnewwallet" });
-    await openServerBlock();
-
-    fireEvent.change(screen.getByRole("combobox", { name: /network/i }), {
-      target: { value: ServerChainNameEnum.testChainName },
-    });
-    fireEvent.click(screen.getByRole("radio", { name: "Automatic" }));
-
-    await waitFor(() => expect(liveList).toHaveBeenCalledWith(ServerChainNameEnum.testChainName));
-  });
-
-  // Changing the chain afterwards has to re-resolve. Automatic says how to
-  // pick, not which server, so it survives the change — and the server it
-  // resolved for the previous chain must not.
-  it("re-resolves when the chain changes underneath it", async () => {
-    liveList.mockResolvedValue([liveServer("https://mainnet.example:443")]);
-    render(<AddNewWallet {...baseProps} />, { initialRoute: "/addnewwallet" });
-    await openServerBlock();
-
-    fireEvent.change(screen.getByRole("combobox", { name: /network/i }), {
-      target: { value: ServerChainNameEnum.mainChainName },
-    });
-    fireEvent.click(screen.getByRole("radio", { name: "Automatic" }));
-    await waitFor(() => expect(liveList).toHaveBeenCalledWith(ServerChainNameEnum.mainChainName));
-
-    liveList.mockClear();
-    fireEvent.change(screen.getByRole("combobox", { name: /network/i }), {
-      target: { value: ServerChainNameEnum.testChainName },
-    });
-
-    await waitFor(() => expect(liveList).toHaveBeenCalledWith(ServerChainNameEnum.testChainName));
+    expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
+    expect(await screen.findByText(SWARM_NO_AUTOMATIC_REASON)).toBeInTheDocument();
   });
 });
 
@@ -207,7 +169,12 @@ describe("AddNewWallet automatic server", () => {
 // never passes through.
 describe("AddNewWallet on the project chain", () => {
   const SWARM = ServerChainNameEnum.swarmTestnetChainName;
-  const OWN_NODE = SWARM_SERVER_PRESETS[1].uri;
+  const OWN_NODE = "http://127.0.0.1:9067";
+  const MAINNET_SERVER = "https://lwd-main.swarm.green:8443";
+  // This chain's own default, not the build's: the same source file is
+  // packaged twice and `SWARM_SERVER` is the mainnet indexer in the
+  // mainnet package.
+  const SWARM_SERVER = swarmDefaultServerFor(SWARM);
 
   /** A profile whose stored chain is the project's, as a fresh install has. */
   const storedSettings = (overrides: Partial<typeof mockSettings> = {}) =>
@@ -245,7 +212,7 @@ describe("AddNewWallet on the project chain", () => {
     storedSettings();
     await mount();
 
-    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER);
+    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_SERVER);
     expect(screen.getByLabelText("Custom server URI")).toBeEnabled();
   });
 
@@ -280,7 +247,7 @@ describe("AddNewWallet on the project chain", () => {
     storedSettings();
     await mount();
 
-    await waitFor(() => expect(screen.getByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER));
+    await waitFor(() => expect(screen.getByLabelText("Custom server URI")).toHaveValue(SWARM_SERVER));
     expect(liveList).not.toHaveBeenCalledWith(SWARM);
   });
 
@@ -290,7 +257,7 @@ describe("AddNewWallet on the project chain", () => {
 
     fireEvent.change(screen.getByRole("combobox", { name: /network/i }), { target: { value: SWARM } });
 
-    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER);
+    expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_SERVER);
     expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
   });
 
@@ -302,7 +269,7 @@ describe("AddNewWallet on the project chain", () => {
       fireEvent.change(screen.getByRole("combobox", { name: /type of wallet creation/i }), {
         target: { value: type },
       });
-      expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_DEFAULT_SERVER);
+      expect(await screen.findByLabelText("Custom server URI")).toHaveValue(SWARM_SERVER);
       expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
     }
   });
@@ -339,13 +306,13 @@ describe("AddNewWallet on the project chain", () => {
     expect(screen.queryByRole("radio", { name: "Automatic" })).toBeNull();
   });
 
-  it("offers both project servers and still takes a typed one", async () => {
+  it("offers every SWARM preset and still takes a typed one", async () => {
     storedSettings();
     await mount();
 
     const presets = await screen.findByRole("combobox", { name: /swarm server/i });
     for (const preset of SWARM_SERVER_PRESETS) {
-      expect(within(presets).getByRole("option", { name: new RegExp(preset.label) })).toBeInTheDocument();
+      expect(within(presets).getByRole("option", { name: `${preset.label} — ${preset.uri}` })).toBeInTheDocument();
     }
 
     fireEvent.change(presets, { target: { value: OWN_NODE } });
@@ -353,6 +320,72 @@ describe("AddNewWallet on the project chain", () => {
 
     fireEvent.change(screen.getByLabelText("Custom server URI"), { target: { value: "http://127.0.0.1:1234" } });
     expect(screen.getByLabelText("Custom server URI")).toHaveValue("http://127.0.0.1:1234");
+  });
+
+  // The defect the mainnet release of 2026-09-26 shipped with: no mainnet
+  // preset at all, so the only way onto the live network was to type the
+  // address, and touching the dropdown put the wallet back on the testnet.
+  it("puts a mainnet wallet on the mainnet indexer, and builds it on the mainnet chain", async () => {
+    storedSettings();
+    (native.wallet_exists as jest.Mock).mockResolvedValue(false);
+    (native.init_new as jest.Mock).mockResolvedValue('{"seed":"x"}');
+    (native.info_server as jest.Mock).mockResolvedValue(
+      JSON.stringify({ chain_name: "swarm-mainnet", server_uri: MAINNET_SERVER }),
+    );
+    await mount();
+
+    fireEvent.change(await screen.findByRole("combobox", { name: /swarm server/i }), {
+      target: { value: MAINNET_SERVER },
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("Custom server URI")).toHaveValue(MAINNET_SERVER));
+    expect(screen.getByRole("combobox", { name: /network/i })).toHaveValue("swarm-mainnet");
+
+    fireEvent.click(screen.getByRole("button", { name: /create wallet/i }));
+
+    // The chain hint is the single string that decides the ChainType, and so
+    // decides whether the first address is `swm1…` or something else entirely.
+    await waitFor(() => expect(native.init_new).toHaveBeenCalled());
+    expect((native.init_new as jest.Mock).mock.calls[0][1]).toBe("swarm-mainnet");
+    expect((native.init_new as jest.Mock).mock.calls[0][0]).toBe(MAINNET_SERVER);
+  });
+
+  it("builds a testnet wallet on the testnet chain", async () => {
+    storedSettings();
+    (native.wallet_exists as jest.Mock).mockResolvedValue(false);
+    (native.init_new as jest.Mock).mockResolvedValue('{"seed":"x"}');
+    (native.info_server as jest.Mock).mockResolvedValue(
+      JSON.stringify({ chain_name: "swarm-testnet", server_uri: SWARM_SERVER }),
+    );
+    await mount();
+
+    fireEvent.click(screen.getByRole("button", { name: /create wallet/i }));
+
+    await waitFor(() => expect(native.init_new).toHaveBeenCalled());
+    expect((native.init_new as jest.Mock).mock.calls[0][1]).toBe("swarm-testnet");
+  });
+
+  // "Another server" takes anything, so the chain the server reports is checked
+  // against the chain the wallet was built for, and a mismatch throws the
+  // wallet away rather than registering it.
+  it("refuses a typed server that serves another chain, and registers nothing", async () => {
+    storedSettings();
+    (native.wallet_exists as jest.Mock).mockResolvedValue(false);
+    (native.init_new as jest.Mock).mockResolvedValue('{"seed":"x"}');
+    (native.info_server as jest.Mock).mockResolvedValue(
+      JSON.stringify({ chain_name: "main", server_uri: "https://zec.rocks:443" }),
+    );
+    const openErrorModal = jest.fn();
+    render(<AddNewWallet {...baseProps} />, { initialRoute: "/addnewwallet", contextOverrides: { openErrorModal } });
+    fireEvent.click((await screen.findAllByText("Selected Server"))[0]);
+    await screen.findByLabelText("Custom server URI");
+
+    fireEvent.click(screen.getByRole("button", { name: /create wallet/i }));
+
+    await waitFor(() => expect(openErrorModal).toHaveBeenCalled());
+    const said = openErrorModal.mock.calls.map((call) => call[1]).join(" ");
+    expect(said).toContain("The wallet was not created.");
+    expect(ipcRenderer.invoke).not.toHaveBeenCalledWith("wallets:add", expect.anything());
   });
 
   // A server that does not answer is a sentence naming the host, not a
@@ -364,7 +397,7 @@ describe("AddNewWallet on the project chain", () => {
       initialRoute: "/addnewwallet",
       contextOverrides: { openErrorModal },
     });
-    expect(await screen.findByText(SWARM_DEFAULT_SERVER)).toBeInTheDocument();
+    expect(await screen.findByText(SWARM_SERVER)).toBeInTheDocument();
     probe.mockResolvedValue(null);
 
     fireEvent.click(screen.getByRole("button", { name: /create wallet/i }));

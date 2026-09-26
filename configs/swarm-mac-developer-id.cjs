@@ -3,7 +3,7 @@
 // The SWARM-specific config is the source of truth for app ID, version,
 // artwork, licences and storage. Only the direct-download Mac signing path is
 // overridden here; the generic upstream/MAS configuration is never used.
-const base = require("./swarm-testnet-builder.cjs");
+const base = require("./swarm-builder.cjs");
 const developerIdIdentity = require("../scripts/mac-distribution-identity.cjs");
 const arch = process.env.SWARM_MAC_ARCH || "arm64";
 if (!["arm64", "x64"].includes(arch)) throw new Error(`Unsupported SWARM_MAC_ARCH: ${arch}`);

@@ -1,21 +1,29 @@
-const fs = require("fs");
-const path = require("path");
-
 const upstream = require("../package.json").build;
+const buildProfile = require("../src/buildProfile.json");
 
-// The version every artifact is named after, read from the single place the
-// application already states it. package.json still carries upstream's
-// 2.0.26, which is how the first packages came out named "2.0.26" — a number
-// that says nothing about which SWARM build someone downloaded.
-const versionSource = fs.readFileSync(path.join(__dirname, "../src/version.ts"), "utf8");
-const VERSION = /const APP_VERSION = "([^"]+)"/.exec(versionSource)[1];
-
-// Packaging for the SwarmTestnet wallet: unsigned, portable test builds for
-// Windows, Linux and macOS. It changes identity, artwork and what the
-// installer touches — never behaviour.
+// Packaging for the SWARM wallet: unsigned, portable builds for Windows, Linux
+// and macOS. It changes identity, artwork and what the installer touches —
+// never behaviour.
 //
-// `productName` carries the parentheses because that is the product's name;
-// `executableName` does not, so the file on disk, the process name the
+// PROFILE-AWARE, since 2026-09-26. Everything below that names the product used
+// to be a literal: "SWARM Wallet (Testnet)", app id `green.swarm.wallet.testnet`,
+// version read out of src/version.ts. So the first mainnet build — which
+// carried the real mainnet genesis — installed as "SWARM Wallet (Testnet)"
+// 0.1.0-testnet.9 and nobody could tell from the machine which network they
+// had. The identity now comes from src/buildProfile.json, the one file
+// `scripts/set-build-profile.js` writes from the workflows' `network_profile`
+// input, and the renderer reads the same record for the About box.
+//
+// THE APP IDS ARE DELIBERATELY DIFFERENT. `green.swarm.wallet.testnet` and
+// `green.swarm.wallet` are two applications to Windows, macOS and Linux alike:
+// the mainnet wallet installs BESIDE an existing testnet one, gets its own
+// uninstall entry, its own shortcut and its own keychain entry, and neither
+// upgrade path touches the other. That is intended. A single id would have made
+// the mainnet installer silently replace a testnet install whose wallet files
+// it cannot open.
+//
+// `productName` carries whatever parentheses the profile gives it;
+// `executableName` never does, so the file on disk, the process name the
 // launcher looks for and the window's own title stay easy to quote.
 //
 // The icons are the style guide's hive bee, rendered by
@@ -25,8 +33,23 @@ const VERSION = /const APP_VERSION = "([^"]+)"/.exec(versionSource)[1];
 // wallet for the public Zcash network and must not become the machine's
 // default for its payment links.
 
-const PRODUCT = "SWARM Wallet (Testnet)";
-const EXECUTABLE = "SWARM Wallet Testnet";
+const PROFILE_ID = buildProfile.profile;
+const IDENTITY = buildProfile.profiles[PROFILE_ID];
+if (!IDENTITY) {
+  throw new Error(
+    `src/buildProfile.json selects '${PROFILE_ID}', which it does not describe. ` +
+      `On offer: ${Object.keys(buildProfile.profiles).join(", ")}.`,
+  );
+}
+
+const PRODUCT = IDENTITY.productName;
+const EXECUTABLE = IDENTITY.executableName;
+// The version every artifact is named after, read from the single place the
+// application already states it — the same record the About box shows.
+// package.json still carries upstream's 2.0.26, which is how the first packages
+// came out named "2.0.26", a number that says nothing about which SWARM build
+// someone downloaded.
+const VERSION = IDENTITY.version;
 
 // Both MIT licences travel with every binary. The SDK's comes from the
 // pinned-revision checkout the workflow makes for scripts/check-swarm-sdk-pin.js,
@@ -40,14 +63,18 @@ module.exports = {
   ...upstream,
   productName: PRODUCT,
   executableName: EXECUTABLE,
-  appId: "green.swarm.wallet.testnet",
+  appId: IDENTITY.appId,
   artifactName: "SWARM-Wallet-${version}-${arch}.${ext}",
   extraMetadata: {
     version: VERSION,
     main: "build/electron.js",
-    name: "swarm-wallet-testnet",
+    name: IDENTITY.packageName,
     productName: PRODUCT,
-    description: "Wallet for the SwarmTestnet network. Test coins with no value.",
+    description: IDENTITY.description,
+    // Which SWARM network this package is for, inside the package. The main
+    // process reads it before any renderer module exists, to decide where a
+    // fresh profile starts (public/electron.js, SWARM_BUILD_CHAIN).
+    swarmNetworkProfile: PROFILE_ID,
   },
   // This is the unsigned integration baseline. The separate
   // swarm-mac-developer-id.cjs config enables direct-download Mac signing and
@@ -110,12 +137,12 @@ module.exports = {
     desktop: {
       entry: {
         Name: PRODUCT,
-        Comment: "Wallet for the SwarmTestnet network",
+        Comment: IDENTITY.description,
         GenericName: "Wallet",
         Type: "Application",
         StartupNotify: true,
         Categories: "Office;Finance;",
-        Keywords: "swarm;wallet;testnet;",
+        Keywords: `swarm;wallet;${IDENTITY.artifactSuffix};`,
       },
     },
   },

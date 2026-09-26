@@ -7,8 +7,14 @@
 rm -f '/usr/share/polkit-1/actions/green.swarm.wallet.policy'
 
 # Only our own symlink, never one a user made themselves pointing elsewhere.
+# Two packages can be installed side by side — /opt/SWARM Wallet for the
+# mainnet build and /opt/SWARM Wallet (Testnet) for the testnet one — so the
+# link is removed if it points at either of the two we make, and at nothing
+# else.
+LINK="$(readlink /usr/bin/swarm-wallet 2>/dev/null || true)"
 if [ -L /usr/bin/swarm-wallet ] \
-   && [ "$(readlink /usr/bin/swarm-wallet)" = '/opt/SWARM Wallet (Testnet)/SWARM Wallet Testnet' ]; then
+   && { [ "$LINK" = '/opt/SWARM Wallet/SWARM Wallet' ] \
+     || [ "$LINK" = '/opt/SWARM Wallet (Testnet)/SWARM Wallet Testnet' ]; }; then
     rm -f /usr/bin/swarm-wallet
 fi
 

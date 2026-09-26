@@ -1,44 +1,147 @@
 import {
+  ACTIVE_SWARM_PROFILE,
   MASK_CELL,
   SWARM_APP_NAME,
   SWARM_CHAIN,
   SWARM_DEFAULT_SERVER,
+  SWARM_MAINNET_SERVER_URI,
   SWARM_SERVER_PRESETS,
   SWARM_TICKER,
   isSwarmChain,
   maskAmount,
+  resolveActiveProfile,
+  swarmDefaultServerFor,
   swarmPresetFor,
+  swarmPresetsForChain,
   swarmUnreachableMessage,
 } from "./swarmNetwork";
+import { BUILD_IDENTITIES, BUILD_PROFILE_ID } from "./buildIdentity";
+import {
+  SWARM_MAINNET_PROFILE,
+  SWARM_TESTNET_PROFILE,
+  SwarmProfileIdEnum,
+  isProfileSelectable,
+  withoutGenesis,
+} from "./networkProfiles";
 import { ServerChainNameEnum } from "../components/appstate";
 
-describe("the project network's identity", () => {
+describe("the network this build is for", () => {
   it("is the chain label the indexer reports", () => {
-    expect(SWARM_CHAIN).toBe("swarm-testnet");
+    expect(SWARM_CHAIN).toBe(ACTIVE_SWARM_PROFILE.chainLabel);
     expect(isSwarmChain(SWARM_CHAIN)).toBe(true);
+    expect(isSwarmChain(ServerChainNameEnum.swarmTestnetChainName)).toBe(true);
+    expect(isSwarmChain(ServerChainNameEnum.swarmMainnetChainName)).toBe(true);
+  });
+
+  // Upstream Zcash is not a SWARM network and no screen may treat it as one.
+  // Before 2026-09-26 `isSwarmChain` meant SwarmTestnet alone, so on every
+  // other chain the create-a-wallet screen fell through to upstream's server
+  // list — which is how an owner ended up with a `u1…` Zcash wallet.
+  it("is not upstream Zcash, on any of its three chains", () => {
+    expect(isSwarmChain(ServerChainNameEnum.mainChainName)).toBe(false);
     expect(isSwarmChain(ServerChainNameEnum.testChainName)).toBe(false);
+    expect(isSwarmChain(ServerChainNameEnum.regtestChainName)).toBe(false);
     expect(isSwarmChain("")).toBe(false);
     expect(isSwarmChain(undefined)).toBe(false);
   });
 
   // SWARM is the project; SWM is what a balance is counted in.
-  it("counts balances in SWM", () => {
+  it("counts balances in SWM and names itself from the build profile", () => {
     expect(SWARM_TICKER).toBe("SWM");
-    expect(SWARM_APP_NAME).toBe("SWARM Wallet (Testnet)");
+    expect(SWARM_APP_NAME).toBe(BUILD_IDENTITIES[BUILD_PROFILE_ID].productName);
+  });
+
+  // The two identities this repository can be packaged under. Stated here, not
+  // derived, because the whole point is that a mainnet build must not be able
+  // to call itself the testnet one.
+  it("has one identity per network, and they are different applications", () => {
+    expect(BUILD_IDENTITIES["swarm-mainnet"]).toMatchObject({
+      version: "0.1.0-mainnet.1",
+      productName: "SWARM Wallet",
+      appId: "green.swarm.wallet",
+      packageName: "swarm-wallet-mainnet",
+    });
+    expect(BUILD_IDENTITIES["swarm-testnet"]).toMatchObject({
+      version: "0.1.0-testnet.9",
+      productName: "SWARM Wallet (Testnet)",
+      appId: "green.swarm.wallet.testnet",
+      packageName: "swarm-wallet-testnet",
+    });
+    expect(BUILD_IDENTITIES["swarm-mainnet"].appId).not.toBe(BUILD_IDENTITIES["swarm-testnet"].appId);
+  });
+
+  // A build branded for a network it cannot reach would be a build nobody can
+  // use, so the branding follows what is actually selectable.
+  it("brands itself for the network it selects, and falls back when that network has not launched", () => {
+    expect(resolveActiveProfile("swarm-mainnet")).toBe(SWARM_MAINNET_PROFILE);
+    expect(resolveActiveProfile("swarm-testnet")).toBe(SWARM_TESTNET_PROFILE);
+    expect(resolveActiveProfile("main")).toBe(SWARM_TESTNET_PROFILE);
+    expect(isProfileSelectable(withoutGenesis(SWARM_MAINNET_PROFILE))).toBe(false);
   });
 });
 
-describe("the servers offered for this chain", () => {
-  it("offers the project server first and a local node second", () => {
+describe("the servers this application offers", () => {
+  // The defect this list exists to close: upstream's twenty lightwalletd
+  // endpoints used to be one dropdown away from the Create button.
+  it("offers SWARM's endpoints and no upstream Zcash server", () => {
     expect(SWARM_SERVER_PRESETS.map((preset) => preset.uri)).toEqual([
+      "https://lwd-main.swarm.green:8443",
       "https://lwd.swarm.green:443",
       "http://127.0.0.1:9067",
     ]);
-    expect(SWARM_DEFAULT_SERVER).toBe(SWARM_SERVER_PRESETS[0].uri);
+    for (const preset of SWARM_SERVER_PRESETS) {
+      expect(preset.uri).not.toMatch(/zec\.rocks|lightwalletd\.com|zcash-infra\.com|zcash/i);
+    }
+  });
+
+  // The preset the release of 2026-09-26 did not have. Without it the only way
+  // onto the live network was to type the address under "Another server", and
+  // switching the dropdown back to a preset silently returned the wallet to the
+  // testnet.
+  it("offers SWARM Mainnet first, and makes it the default once mainnet has launched", () => {
+    const mainnet = SWARM_SERVER_PRESETS[0];
+    expect(mainnet.label).toBe("SWARM Mainnet");
+    expect(mainnet.profileId).toBe(SwarmProfileIdEnum.mainnet);
+    expect(mainnet.uri).toBe(SWARM_MAINNET_SERVER_URI);
+    expect(SWARM_MAINNET_SERVER_URI).toBe("https://lwd-main.swarm.green:8443");
+
+    // Launched: genesis present and the indexer deployed. Both are facts of
+    // this build, and they are what make the preset selectable at all.
+    expect(isProfileSelectable(SWARM_MAINNET_PROFILE)).toBe(true);
+    expect(SWARM_MAINNET_PROFILE.serverIsLive).toBe(true);
+
+    expect(swarmDefaultServerFor(ServerChainNameEnum.swarmMainnetChainName)).toBe(SWARM_MAINNET_SERVER_URI);
+    expect(resolveActiveProfile("swarm-mainnet").chainLabel).toBe(ServerChainNameEnum.swarmMainnetChainName);
+  });
+
+  it("keeps the testnet selectable and says on the label that its coins are worthless", () => {
+    const testnet = SWARM_SERVER_PRESETS[1];
+    expect(testnet.label).toBe("SWARM Testnet (coins have no value)");
+    expect(testnet.profileId).toBe(SwarmProfileIdEnum.testnet);
+    expect(testnet.uri).toBe("https://lwd.swarm.green:443");
+    expect(swarmDefaultServerFor(ServerChainNameEnum.swarmTestnetChainName)).toBe("https://lwd.swarm.green:443");
+  });
+
+  // A preset belongs to one network, and a wallet on one network must never be
+  // offered the other's indexer as if it were interchangeable.
+  it("keeps each network's endpoints to itself", () => {
+    expect(swarmPresetsForChain(ServerChainNameEnum.swarmMainnetChainName).map((p) => p.uri)).toEqual([
+      "https://lwd-main.swarm.green:8443",
+    ]);
+    expect(swarmPresetsForChain(ServerChainNameEnum.swarmTestnetChainName).map((p) => p.uri)).toEqual([
+      "https://lwd.swarm.green:443",
+      "http://127.0.0.1:9067",
+    ]);
+    expect(swarmPresetsForChain(ServerChainNameEnum.mainChainName)).toEqual([]);
+  });
+
+  it("starts this build on its own network's indexer", () => {
+    expect(SWARM_DEFAULT_SERVER).toBe(swarmDefaultServerFor(SWARM_CHAIN));
+    expect(swarmPresetFor(SWARM_DEFAULT_SERVER)?.profileId).toBe(ACTIVE_SWARM_PROFILE.id);
   });
 
   it("recognises a preset and does not claim a typed address is one", () => {
-    expect(swarmPresetFor(SWARM_DEFAULT_SERVER)?.label).toBe("SWARM public server");
+    expect(swarmPresetFor("https://lwd-main.swarm.green:8443")?.label).toBe("SWARM Mainnet");
     expect(swarmPresetFor("https://somewhere.example:443")).toBeUndefined();
   });
 
@@ -48,13 +151,13 @@ describe("the servers offered for this chain", () => {
   // network was down while it was live.
   it("names the host and says the wallet keeps trying", () => {
     const said = swarmUnreachableMessage(SWARM_DEFAULT_SERVER);
-    expect(said).toContain("lwd.swarm.green");
+    expect(said).toContain(ACTIVE_SWARM_PROFILE.id === SwarmProfileIdEnum.mainnet ? "lwd-main" : "lwd.swarm.green");
     expect(said).toContain("keeps retrying");
     expect(said).not.toMatch(/not running|not deployed|not live/i);
   });
 
   it("points someone on their own node at their own indexer", () => {
-    const said = swarmUnreachableMessage(SWARM_SERVER_PRESETS[1].uri);
+    const said = swarmUnreachableMessage("http://127.0.0.1:9067");
     expect(said).toContain("127.0.0.1");
     expect(said).toContain("indexer is running");
   });

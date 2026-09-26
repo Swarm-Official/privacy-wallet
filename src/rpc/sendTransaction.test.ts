@@ -18,6 +18,14 @@ function client() {
   rpc.clearTimers = jest.fn().mockResolvedValue(undefined);
   rpc.configure = jest.fn().mockResolvedValue(undefined);
   rpc.fnSetFetchError = jest.fn();
+  // A wallet on a SWARM network. Sending refuses outright for anything else
+  // (see serverIdentityGate.test.ts), and this suite is about the overlapping
+  // payment guard, not about which chain the wallet is on.
+  rpc.currentWallet = {
+    id: 1,
+    chain_name: "swarm-mainnet",
+    uri: "https://lwd-main.swarm.green:8443",
+  } as unknown as RPC["currentWallet"];
   return rpc;
 }
 
@@ -36,9 +44,10 @@ it("rejects a second payment while the first proof is pending, even on another R
       }),
   );
   const first = client().sendTransaction([]);
-  // Allow the proposal to resolve and the proof to start.
-  await Promise.resolve();
-  await Promise.resolve();
+  // Let the server-identity check, the proposal and the start of the proof all
+  // settle. Counting microtasks broke the moment the send path grew the chain
+  // check in front of it; draining the queue does not care how many there are.
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(confirm).toHaveBeenCalledTimes(1);
   await expect(client().sendTransaction([])).rejects.toThrow("already being prepared or sent");
   expect(send).toHaveBeenCalledTimes(1);

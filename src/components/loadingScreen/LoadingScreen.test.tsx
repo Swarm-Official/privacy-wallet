@@ -146,14 +146,24 @@ test("a custom server is left alone", async () => {
 // The anomaly rule: a mode whose server died is worth less than a mode that
 // can recover, so it lands on `auto` rather than on a dead URI.
 test("a list choice on a now-obsolete server lands on auto", async () => {
-  bootWithSelection(ServerSelectionEnum.list, "https://lwd1.zcash-infra.com:9067");
+  // The retired Privacy Testnet indexer. Upstream Zcash's obsolete endpoints
+  // used to stand in here; they are not in the build any more.
+  bootWithSelection(
+    ServerSelectionEnum.list,
+    "https://lwd.swarm.green:19767",
+    ServerChainNameEnum.swarmTestnetChainName,
+  );
 
   await waitFor(() => expect(savedSelection().length).toBeGreaterThan(0));
   expect(savedSelection()).toContain(ServerSelectionEnum.auto);
 });
 
 test("a custom choice on a now-obsolete server lands on auto", async () => {
-  bootWithSelection(ServerSelectionEnum.custom, "https://mainnet.lightwalletd.com:9067");
+  bootWithSelection(
+    ServerSelectionEnum.custom,
+    "https://lwd.swarm.green:19767",
+    ServerChainNameEnum.swarmTestnetChainName,
+  );
 
   await waitFor(() => expect(savedSelection().length).toBeGreaterThan(0));
   expect(savedSelection()).toContain(ServerSelectionEnum.auto);
@@ -177,10 +187,15 @@ test("auto races the registry's best few instead of trusting its order", async (
 });
 
 test("auto falls back to the static list when the registry is silent", async () => {
-  bootWithSelection(ServerSelectionEnum.auto, "https://zec.rocks:443");
+  // SWARM has no registry at all, so this is the only path its wallets take.
+  bootWithSelection(
+    ServerSelectionEnum.auto,
+    "https://lwd.swarm.green:443",
+    ServerChainNameEnum.swarmTestnetChainName,
+  );
 
   await waitFor(() => expect(savedSetting("serveruri").length).toBeGreaterThan(0));
-  expect(probedUris()).toContain("https://zec.rocks:443");
+  expect(probedUris()).toContain("https://lwd.swarm.green:443");
   expect(savedSelection()).toEqual([ServerSelectionEnum.auto]);
 });
 

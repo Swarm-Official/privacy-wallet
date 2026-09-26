@@ -8,6 +8,13 @@ name: SWARM wallet Windows test build
 # kept for the day this branch becomes the default.
 on:
   workflow_dispatch:
+    inputs:
+      network_profile:
+        description: 'Which SWARM network this build is for: swarm-testnet or swarm-mainnet'
+        required: false
+        default: 'swarm-testnet'
+        type: choice
+        options: [swarm-testnet, swarm-mainnet]
   push:
     tags:
       - "swarm-build-*"
@@ -70,6 +77,16 @@ jobs:
           npm install --global yarn@1.22.22
       - name: Install locked JavaScript dependencies
         run: yarn install --frozen-lockfile
+      # Which network this build is for, written into the tree before anything
+      # reads it: the renderer's branding, the version, the product name, the
+      # app id and the installer's file name all come from src/buildProfile.json.
+      # The node app does the same thing with the same input
+      # (scripts/set-build-profile.mjs there). Default swarm-testnet, so a
+      # `swarm-build-*` tag push keeps producing exactly what it produced before.
+      - name: Select the network this build is for
+        run: node scripts/set-build-profile.js
+        env:
+          SWARM_NETWORK_PROFILE: ${{ inputs.network_profile || 'swarm-testnet' }}
       - name: Validate the complete Windows packaging configuration
         run: node scripts/check-swarm-package-config.js
       # Everything cheap that can refuse the build runs before the hour of
@@ -132,7 +149,7 @@ jobs:
       - name: Preserve compiled app inputs before packaging
         uses: actions/upload-artifact@v4
         with:
-          name: swarm-wallet-windows-compiled-inputs
+          name: swarm-wallet-windows-compiled-inputs-${{ inputs.network_profile || 'swarm-testnet' }}
           path: |
             build/
             src/native.node
@@ -150,7 +167,7 @@ jobs:
       # smoke test that installs it could not have passed on any run. The
       # config is now the only place targets are decided.
       - name: Package the unsigned test wallet
-        run: yarn electron-builder --win --x64 --config configs/swarm-testnet-builder.cjs --publish never
+        run: yarn electron-builder --win --x64 --config configs/swarm-builder.cjs --publish never
       - name: Check every declared package target was produced
         run: node scripts/check-swarm-dist-targets.js win
       - name: Record whether the wallet server was reachable from this runner
@@ -170,7 +187,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: swarm-smoke-diagnostics-windows
+          name: swarm-smoke-diagnostics-windows-${{ inputs.network_profile || 'swarm-testnet' }}
           path: dist/smoke-diagnostics/
           if-no-files-found: ignore
           retention-days: 14
@@ -181,9 +198,10 @@ jobs:
           Get-FileHash dist/*.zip, dist/*.exe -Algorithm SHA256 | Format-List | Out-File dist/SHA256SUMS.txt
           Copy-Item native/Cargo.lock dist/Cargo.lock
           Copy-Item sdk-integration.json dist/sdk-integration.json
+          Copy-Item src/buildProfile.json dist/build-profile.json
       - uses: actions/upload-artifact@v4
         with:
-          name: swarm-wallet-windows-x64-unsigned-testnet
+          name: swarm-wallet-windows-x64-unsigned-${{ inputs.network_profile || 'swarm-testnet' }}
           path: |
             dist/*.zip
             dist/*.exe
@@ -191,4 +209,5 @@ jobs:
             dist/source-commit.txt
             dist/Cargo.lock
             dist/sdk-integration.json
+            dist/build-profile.json
           retention-days: 14

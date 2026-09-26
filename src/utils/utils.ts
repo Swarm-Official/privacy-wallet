@@ -10,8 +10,7 @@ import randomColor from "randomcolor";
 
 import { native, shell } from "../electronBridge";
 import { ServerChainNameEnum } from "../components/appstate";
-import { SWARM_NETWORK_LABEL } from "./swarmNetwork";
-import { SWARM_MAINNET_PROFILE, swarmProfileFor } from "./networkProfiles";
+import { SWARM_MAINNET_PROFILE, SWARM_TESTNET_PROFILE, swarmProfileFor } from "./networkProfiles";
 import { checkAddressForChain } from "./swarmAddress";
 
 export const NO_CONNECTION: string = "Could not connect to the Server";
@@ -211,7 +210,7 @@ export default class Utils {
       case ServerChainNameEnum.regtestChainName:
         return "Regtest";
       case ServerChainNameEnum.swarmTestnetChainName:
-        return SWARM_NETWORK_LABEL;
+        return SWARM_TESTNET_PROFILE.displayName;
       case ServerChainNameEnum.swarmMainnetChainName:
         return SWARM_MAINNET_PROFILE.displayName;
       default:

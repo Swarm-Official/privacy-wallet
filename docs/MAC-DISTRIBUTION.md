@@ -54,7 +54,7 @@ the local runtime check; signing, notarization and architecture checks still
 run. An Intel Mac or Rosetta is required to test the signed app's launch.
 
 The distribution config keeps the app ID, name, network, SDK attribution and
-licences from `configs/swarm-testnet-builder.cjs`. Electron signs the native
+licences from `configs/swarm-builder.cjs`. Electron signs the native
 addon, Nym helper, frameworks and app using hardened runtime; the build hook
 checks their Developer ID signatures. Electron-builder notarizes and staples
 the app before packaging, and the script notarizes and staples the final DMG,

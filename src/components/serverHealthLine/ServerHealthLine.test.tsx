@@ -136,6 +136,12 @@ test.each([
 // Clicking follows the mode, not the colour: the mode says who owns the choice
 // of server, and that decides who gets to change it.
 test.each([[HEALTHY], [DEAD]])("auto always offers to rotate, dot at %#", async (outcomes) => {
+  // Somewhere to rotate TO has to exist, and since 2026-09-26 the static
+  // list carries SWARM's endpoints alone — upstream Zcash's twenty
+  // lightwalletd servers are gone from the build. A wallet on upstream's
+  // `main` therefore has nowhere to go unless the registry names somewhere,
+  // which is what this says.
+  registry("https://zec.rocks:443", "https://elsewhere.example:443");
   show(ServerSelectionEnum.auto, outcomes);
   fireEvent.click(screen.getByRole("button", { name: "Active server health" }));
 
@@ -153,6 +159,12 @@ test.each([[HEALTHY], [DEAD]])("auto always offers to rotate, dot at %#", async 
 // ever opened for a wallet already on `list`, a mode reachable only through
 // the wallet settings screen.
 test("auto also offers to choose a server by hand", async () => {
+  // Somewhere to rotate TO has to exist, and since 2026-09-26 the static
+  // list carries SWARM's endpoints alone — upstream Zcash's twenty
+  // lightwalletd servers are gone from the build. A wallet on upstream's
+  // `main` therefore has nowhere to go unless the registry names somewhere,
+  // which is what this says.
+  registry("https://zec.rocks:443", "https://elsewhere.example:443");
   show(ServerSelectionEnum.auto, HEALTHY);
   fireEvent.click(screen.getByRole("button", { name: "Active server health" }));
 
@@ -297,6 +309,12 @@ test("Auto is offered to a wallet already on it", async () => {
 // leave the mode alone, which it did not when the switch decided the mode for
 // every caller.
 test("rotating does not turn the wallet into a hand pick", async () => {
+  // Somewhere to rotate TO has to exist, and since 2026-09-26 the static
+  // list carries SWARM's endpoints alone — upstream Zcash's twenty
+  // lightwalletd servers are gone from the build. A wallet on upstream's
+  // `main` therefore has nowhere to go unless the registry names somewhere,
+  // which is what this says.
+  registry("https://zec.rocks:443", "https://elsewhere.example:443");
   show(ServerSelectionEnum.auto, HEALTHY);
   fireEvent.click(screen.getByRole("button", { name: "Active server health" }));
 

@@ -1,0 +1,32 @@
+{
+  "_comment": "Which SWARM network THIS BUILD is packaged for, and the identity it is packaged under. Written by scripts/set-build-profile.js from SWARM_NETWORK_PROFILE — the same input the workflows take — so the renderer's branding, the main process's window title and electron-builder's product name, app id and version cannot disagree with each other.",
+  "_why": [
+    "A build ships every network definition it carries. Until now nothing inside the",
+    "packaged wallet recorded which one it was BUILT for, so the mainnet build of",
+    "2026-09-26 called itself 'SWARM Wallet (Testnet)' 0.1.0-testnet.9 and opened on",
+    "the testnet server while carrying the real mainnet genesis. The node app hit the",
+    "same wall and solved it the same way (electron/net/build-profile.json there).",
+    "See docs/SWARM-NETWORK-PROFILES.md, 'What a build is branded as'."
+  ],
+  "profile": "swarm-testnet",
+  "profiles": {
+    "swarm-testnet": {
+      "version": "0.1.0-testnet.9",
+      "productName": "SWARM Wallet (Testnet)",
+      "executableName": "SWARM Wallet Testnet",
+      "appId": "green.swarm.wallet.testnet",
+      "packageName": "swarm-wallet-testnet",
+      "description": "Wallet for the SwarmTestnet network. Test coins with no value.",
+      "artifactSuffix": "testnet"
+    },
+    "swarm-mainnet": {
+      "version": "0.1.0-mainnet.1",
+      "productName": "SWARM Wallet",
+      "executableName": "SWARM Wallet",
+      "appId": "green.swarm.wallet",
+      "packageName": "swarm-wallet-mainnet",
+      "description": "Wallet for the SWARM network.",
+      "artifactSuffix": "mainnet"
+    }
+  }
+}

@@ -14,7 +14,9 @@ function assertDeveloperId(file) {
 
 module.exports = async function verifyMacSignedApp(context) {
   if (context.electronPlatformName !== "darwin") throw new Error("Expected a macOS app");
-  const app = path.join(context.appOutDir, "SWARM Wallet Testnet.app");
+  const buildProfile = require("../src/buildProfile.json");
+  const identity = buildProfile.profiles[buildProfile.profile];
+  const app = path.join(context.appOutDir, `${identity.executableName}.app`);
   const resources = path.join(app, "Contents/Resources");
   const nym = path.join(resources, "nym-proxy");
   if (!fs.existsSync(nym)) throw new Error("The pinned Nym helper was not packaged");

@@ -21,8 +21,12 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const PRODUCT = "SWARM Wallet (Testnet)";
-const EXECUTABLE = "SWARM Wallet Testnet.exe";
+// Which network this build is for decides what it is called on disk, so the
+// names are read from the one file that says, not restated here.
+const BUILD_PROFILE = require("../src/buildProfile.json");
+const IDENTITY = BUILD_PROFILE.profiles[BUILD_PROFILE.profile];
+const PRODUCT = IDENTITY.productName;
+const EXECUTABLE = `${IDENTITY.executableName}.exe`;
 const READY = "did-finish-load";
 const TIMEOUT_MS = 120_000;
 // One port per launch, so the portable and installed runs never collide.

@@ -24,7 +24,7 @@ import { deriveMixnetView, MixnetView, UNKNOWN_MIXNET_VIEW } from "./components/
 import { userFacingError } from "../utils/userFacingError";
 import { SWARM_TICKER } from "../utils/swarmNetwork";
 import { swarmProfileFor } from "../utils/networkProfiles";
-import { ServerIdentity, ServerVerdict, checkServerIdentity } from "../utils/serverIdentity";
+import { ServerIdentity, ServerVerdict, checkServerIdentity, notASwarmWallet } from "../utils/serverIdentity";
 import { depositSpendsSourceAddress } from "../swap/depositRouting";
 import { INITIAL_SERVER_HEALTH, ServerHealthState, recordProbe } from "./components/serverHealth";
 import {
@@ -294,14 +294,21 @@ export default class RPC {
    * Whether the wallet may talk to its indexer, checked before syncing and
    * before sending.
    *
-   * Only SWARM chains are checked. Upstream `main`/`test`/`regtest` wallets are
-   * left exactly as they were: their servers are upstream's, this application
-   * makes no claim about them, and adding a gate there would change behaviour
-   * this change is not about.
+   * A wallet that is not on a SWARM chain is refused outright, and not synced.
+   *
+   * It used to be waved through — "upstream `main`/`test`/`regtest` wallets are
+   * left exactly as they were" — on the reasoning that this application makes
+   * no claim about upstream's servers. Then on 2026-09-26 the create-a-wallet
+   * screen, which still offered upstream's chains and upstream's server list,
+   * made one: an owner installing the first SWARM mainnet build ended up with a
+   * real Zcash mainnet wallet showing a `u1…` receive address. No screen offers
+   * those chains any more, but a wallet created by that build is on a machine
+   * now, and syncing it would be this application quietly operating a Zcash
+   * wallet it cannot show correctly. So it says what the wallet is instead.
    */
   async checkServer(): Promise<ServerVerdict> {
     const profile = this.swarmProfile();
-    if (!profile) return { ok: true };
+    if (!profile) return notASwarmWallet(this.currentWallet?.chain_name);
 
     const key = `${profile.chainLabel}|${this.currentWallet?.uri ?? ""}`;
     if (this.serverIdentityOkFor === key) return { ok: true };
@@ -739,7 +746,10 @@ export default class RPC {
     // Before a single block is scanned. A wallet that syncs against the wrong
     // chain writes that chain's state into this wallet file, and no later check
     // can take it back out.
-    if (this.swarmProfile()) {
+    // Unconditional. It used to run only for a wallet that had a SWARM profile,
+    // so a wallet on upstream Zcash's chains was synced without a word — which
+    // is what the `u1…` wallet of 2026-09-26 would have done.
+    {
       const serverVerdict = await this.checkServer();
       if (!this.isCurrent(session)) return;
       if (!serverVerdict.ok) {
@@ -1185,7 +1195,7 @@ export default class RPC {
     // The irreversible one. A transaction built against the wrong chain's
     // consensus rules and broadcast there is not a mistake the user can undo,
     // so the server is re-checked here rather than trusted from the sync path.
-    if (this.swarmProfile()) {
+    {
       const serverVerdict = await this.checkServer();
       if (!serverVerdict.ok) {
         throw new Error(serverVerdict.message);

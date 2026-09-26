@@ -89,13 +89,49 @@ describe("before syncing", () => {
     expect(native.run_sync).toHaveBeenCalled();
   });
 
-  // The upstream chains are not this change's business, and a gate there would
-  // alter behaviour that was working.
-  it("leaves an upstream Zcash wallet exactly as it was", async () => {
-    const { rpc } = client(wallet(ServerChainNameEnum.mainChainName));
+  // Until 2026-09-26 this read "leaves an upstream Zcash wallet exactly as it
+  // was" and asserted that such a wallet synced untouched. Then the
+  // create-a-wallet screen, which still offered upstream's chains and
+  // upstream's servers, produced one: a real Zcash mainnet wallet with a `u1…`
+  // address, inside a SWARM wallet, from a seed phrase its owner had written
+  // down for SWARM. No screen offers those chains now, but the wallet exists on
+  // a machine, and syncing it would be this application operating a Zcash
+  // wallet it cannot show correctly.
+  it("refuses to sync a wallet that is not on a SWARM network, and says what it is", async () => {
+    const errors: string[] = [];
+    const noop = () => {};
+    const rpc = new RPC(
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      noop,
+      (_title: string, message: string) => errors.push(message),
+      noop,
+      noop,
+      wallet(ServerChainNameEnum.mainChainName),
+    );
+
     await rpc.refreshSync();
+
+    expect(native.run_sync).not.toHaveBeenCalled();
+    expect(errors.join(" ")).toMatch(/not a SWARM wallet/i);
+    expect(errors.join(" ")).toMatch(/upstream Zcash's mainnet/);
+    // No round trip is spent asking a server about a wallet that could not be
+    // on the right chain whatever the answer.
     expect(native.info_server).not.toHaveBeenCalled();
-    expect(native.run_sync).toHaveBeenCalled();
+  });
+
+  it("refuses to send from a wallet that is not on a SWARM network", async () => {
+    const { rpc } = client(wallet(ServerChainNameEnum.mainChainName));
+    await expect(rpc.sendTransaction([{ address: "u1abc", amount: 1 } as never])).rejects.toThrow(
+      /not a SWARM wallet/i,
+    );
+    expect(native.send).not.toHaveBeenCalled();
   });
 
   it("asks once per wallet-and-server pair rather than on every pass", async () => {

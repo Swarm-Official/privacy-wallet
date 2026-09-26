@@ -259,8 +259,12 @@ function assertLandingScreen(text, { deviceAuth = false } = {}) {
         "wallet' nor 'I already have a recovery phrase' is offered (defect W-6).",
     );
   }
-  if (!/SWARM Testnet/.test(text)) {
-    throw new Error("The onboarding screen does not name the network this build is for.");
+  // The network this build is for, whichever it is. It used to be the literal
+  // "SWARM Testnet", which the mainnet build would have failed on for saying
+  // the true thing.
+  const NETWORK = require("../src/buildProfile.json").profile === "swarm-mainnet" ? "SWARM Mainnet" : "SWARM Testnet";
+  if (!text.includes(NETWORK)) {
+    throw new Error(`The onboarding screen does not name the network this build is for (${NETWORK}).`);
   }
   return { screen: "onboarding" };
 }

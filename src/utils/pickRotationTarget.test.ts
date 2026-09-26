@@ -52,29 +52,45 @@ test("never returns the server it was asked to leave", async () => {
   );
 });
 
+// SWARM has no registry, so the static list is all a rotation ever has — and
+// since 2026-09-26 that list is SWARM's alone. It used to hold upstream Zcash's
+// twenty lightwalletd endpoints, which is how a rotation, a server picker and
+// finally the create-a-wallet screen could all reach them.
 test("races the static list when the registry says nothing", async () => {
-  race.mockResolvedValue(server("https://eu.zec.rocks:443"));
+  race.mockResolvedValue(server("http://127.0.0.1:9067", ServerChainNameEnum.swarmTestnetChainName));
 
-  expect(await pickRotationTarget(ServerChainNameEnum.mainChainName, ["https://zec.rocks:443"])).toBe(
-    "https://eu.zec.rocks:443",
-  );
+  expect(
+    await pickRotationTarget(ServerChainNameEnum.swarmTestnetChainName, ["https://lwd.swarm.green:443"]),
+  ).toBe("http://127.0.0.1:9067");
   const raced = race.mock.calls[0][0].map((s: ServerClass) => s.uri);
-  expect(raced).not.toContain("https://zec.rocks:443");
+  expect(raced).not.toContain("https://lwd.swarm.green:443");
   expect(raced.length).toBeGreaterThan(0);
 });
 
 test("falls back to the server we ship for the chain when none answer", async () => {
-  expect(await pickRotationTarget(ServerChainNameEnum.testChainName, ["https://zcash.mysideoftheweb.com:19067"])).toBe(
-    "https://testnet.zec.rocks:443",
-  );
+  expect(
+    await pickRotationTarget(ServerChainNameEnum.swarmTestnetChainName, ["https://lwd.swarm.green:443"]),
+  ).toBe("http://127.0.0.1:9067");
 });
 
 test("stays on the wallet's chain", async () => {
   race.mockImplementation(async (servers: ServerClass[]) => servers[0] ?? null);
 
-  const target = await pickRotationTarget(ServerChainNameEnum.testChainName, ["https://testnet.zec.rocks:443"]);
+  const target = await pickRotationTarget(ServerChainNameEnum.swarmMainnetChainName, []);
 
-  expect(target).toBe("https://zcash.mysideoftheweb.com:19067");
+  expect(target).toBe("https://lwd-main.swarm.green:8443");
+  // The testnet's endpoints belong to the testnet, and a mainnet wallet may
+  // not be rotated onto one: a light wallet cannot follow its server to
+  // another chain, least of all from real money to test coins.
+  const raced = race.mock.calls[0][0].map((s: ServerClass) => s.uri);
+  expect(raced).toEqual(["https://lwd-main.swarm.green:8443"]);
+});
+
+// Upstream's chains have no SWARM endpoint, and nothing may invent one for
+// them.
+test("gives up rather than rotating a Zcash wallet onto a SWARM server", async () => {
+  expect(await pickRotationTarget(ServerChainNameEnum.mainChainName, [])).toBeNull();
+  expect(await pickRotationTarget(ServerChainNameEnum.testChainName, [])).toBeNull();
 });
 
 test("gives up rather than rotating to nothing", async () => {

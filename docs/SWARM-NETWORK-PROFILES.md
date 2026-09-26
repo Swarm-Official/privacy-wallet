@@ -18,9 +18,9 @@ restated; where the two disagree, the file is right.
 | `texHrp` | `textest` | `texswm` |
 | `transparentPrefixes` | `tm…` (0x1d25), `t2…` (0x1cba) | `s1…` (0x1c28), `s3…` (0x1c2d) |
 | `defaultServer` | `https://lwd.swarm.green:443` | `lwd-main.swarm.green:8443` |
-| `serverIsLive` | `true` | `false` — the name is reserved, the service is not deployed |
+| `serverIsLive` | `true` | `true` — deployed at the launch ceremony, 2026-09-26 |
 | `grpcPort` | 9067 | 9068 (behind TLS) |
-| `genesis` | `045993f5…8e2a28` | **`null`** — see below |
+| `genesis` | `045993f5…8e2a28` | `01c34428…2c39afdd` — the launch ceremony's |
 | `sdkChainType` | `ChainType::CustomTestnet` | `ChainType::SwarmMainnet(SwarmMainnetGenesis)` |
 | `activationHeight` | 1 | 1 |
 | `distinctivePrefixes` | `swarm1` | `swm1`, `s1`, `s3` |
@@ -39,21 +39,100 @@ addon, where it still decodes `u1…`, `zs1…`, `t1…` and `t3…`. `swarmProf
 resolves the two SWARM labels and nothing else: not `main`, not `mainnet`, not
 `test`, not `regtest`, and it never falls back.
 
-**A profile with no genesis is not selectable.** SWARM production has no genesis
-until the launch ceremony generates one. A wallet that cannot name a chain's
-first block cannot tell that chain's indexer from any other, and one that synced
-the wrong chain would write that chain's state over the right one. So:
+**A profile with no genesis is not selectable.** A wallet that cannot name a
+chain's first block cannot tell that chain's indexer from any other, and one
+that synced the wrong chain would write that chain's state over the right one.
+So a profile whose `genesis` is `null` is refused everywhere: `isProfileSelectable`
+is false, `chainHintFor` throws rather than handing the addon something it might
+act on, `selectableChainOrFallback` rewrites the stored label back to a network
+this build can serve, and `RPC.checkServer` refuses to sync or send whatever the
+server says.
 
-- `SWARM_MAINNET_GENESIS` is `null`. There is no default and no placeholder,
-  here or in the SDK, where `ChainType::try_from("swarm-mainnet")` is an error
-  for the same reason.
-- `isProfileSelectable` is false, `selectableSwarmProfiles()` returns testnet
-  alone, and `unselectableReason` says why in a sentence.
-- `chainHintFor` throws rather than handing the addon something it might act on.
-- `selectableChainOrFallback` rewrites a stored `swarm-mainnet` label back to
-  `swarm-testnet` at startup (`public/electron.js`), because a settings file
-  survives downgrades and hand-editing.
-- `RPC.checkServer` refuses to sync or send, whatever the server says.
+SWARM production held `null` until the launch ceremony of **2026-09-26**. It now
+carries genesis `01c34428b9e67cdd8345e0b365aaa37dd8d2d65d3869e0e5d77d567f2c39afdd`
+and is selectable; the testnet is still selectable beside it, and both are
+offered. The unlaunched behaviour is still asserted, against
+`withoutGenesis(SWARM_MAINNET_PROFILE)`, so it did not have to be deleted to
+make the launch commit.
+
+## What a build is branded as
+
+A build carries **both** network definitions. Which one it is *packaged for* is
+a separate fact, and it lives in `src/buildProfile.json`:
+
+```json
+{ "profile": "swarm-testnet", "profiles": { "swarm-testnet": { … }, "swarm-mainnet": { … } } }
+```
+
+| | `swarm-testnet` | `swarm-mainnet` |
+| --- | --- | --- |
+| version | `0.1.0-testnet.9` | `0.1.0-mainnet.1` |
+| product name | SWARM Wallet (Testnet) | SWARM Wallet |
+| executable | `SWARM Wallet Testnet` | `SWARM Wallet` |
+| app id | `green.swarm.wallet.testnet` | `green.swarm.wallet` |
+| package name | `swarm-wallet-testnet` | `swarm-wallet-mainnet` |
+| Windows installer | `SWARM-Wallet-0.1.0-testnet.9-win-x64-setup.exe` | `SWARM-Wallet-0.1.0-mainnet.1-win-x64-setup.exe` |
+| starts on | `https://lwd.swarm.green:443` | `https://lwd-main.swarm.green:8443` |
+
+`scripts/set-build-profile.js` is the only thing that writes the selection, from
+`SWARM_NETWORK_PROFILE` — the `network_profile` input both build workflows take,
+defaulting to `swarm-testnet` so a tag push still produces exactly what it
+produced before. Four things then read that one record: `src/version.ts` and
+`src/utils/swarmNetwork.ts` (the About box, the window's own name, the network
+a fresh profile starts on), `configs/swarm-builder.cjs` (product name, app id,
+installer file name, and the `swarmNetworkProfile` key it writes into the
+packaged `package.json`), `public/electron.js` (the window title, the keychain
+entry, and the chain a fresh settings file gets — read from that packaged
+`package.json`, because the main process runs before any renderer module), and
+`scripts/check-swarm-package-config.js`, which refuses a build whose packaging
+does not match the record.
+
+**The app ids are deliberately different, so the two install side by side.**
+`green.swarm.wallet` and `green.swarm.wallet.testnet` are two applications to
+Windows, macOS and Linux alike: separate uninstall entries, separate shortcuts,
+separate keychain entries, separate `%APPDATA%`/`~/.config` directories. A
+mainnet installer therefore does **not** replace an existing testnet install —
+it appears beside it. That is intended: one id would have let the mainnet build
+silently take over a testnet install whose wallet files it cannot open.
+
+Why this file exists at all: the first mainnet build, `b6174f2d` on 2026-09-26,
+carried the real mainnet genesis and still called itself "SWARM Wallet
+(Testnet)" version `0.1.0-testnet.9`, because those facts were four literals in
+four files and only the genesis had been moved.
+
+## The servers this application offers
+
+Three presets, and no others anywhere in the build:
+
+| Preset | URI | Network |
+| --- | --- | --- |
+| SWARM Mainnet | `https://lwd-main.swarm.green:8443` | `swarm-mainnet` |
+| SWARM Testnet (coins have no value) | `https://lwd.swarm.green:443` | `swarm-testnet` |
+| My own testnet node | `http://127.0.0.1:9067` | `swarm-testnet` |
+
+`src/utils/serverUrisList.ts` is derived from that list, so the static list, the
+rotation candidates, the server picker and the create-a-wallet screen all see
+the same three. Upstream's twenty lightwalletd endpoints — `zec.rocks`,
+`lightwalletd.com`, `zcash-infra.com` — are **gone from the build**, and the
+Network dropdown offers only the two SWARM chains.
+
+That is not tidying. On 2026-09-26 an owner installed the first mainnet build,
+picked "Mainnet" from a Network dropdown that still listed upstream Zcash's
+chains, took a server from the list beside it, pressed Create, and the Receive
+screen showed him a `u1…` address: a real Zcash mainnet wallet, created by a
+SWARM wallet, from a recovery phrase he had written down for SWARM. Four things
+now stand between a person and that outcome, and each is tested:
+
+1. the Network dropdown offers `swarm-mainnet` and `swarm-testnet` and nothing
+   else, and no upstream endpoint exists to be offered beside them;
+2. creating a wallet refuses any chain that is not a SWARM network;
+3. after `init_*` and before the wallet is registered, the server is asked which
+   chain it serves, and a mismatch throws the wallet away — this is what checks
+   an address typed under "Another server";
+4. `RPC.checkServer` refuses to sync or send a wallet that is not on a SWARM
+   chain, saying "This is not a SWARM wallet", and the Receive screen refuses to
+   draw an address that does not belong to the wallet's own network — no QR
+   code, no copy button.
 
 ## What a release fills in
 

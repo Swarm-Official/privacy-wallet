@@ -57,6 +57,37 @@ export type ServerVerdict =
 const OK: ServerVerdict = { ok: true };
 
 /**
+ * The verdict for a wallet that is not on a SWARM network at all.
+ *
+ * There should be no such wallet: nothing in this build offers upstream Zcash's
+ * chains or its servers any more. But the build of 2026-09-26 offered both, an
+ * owner created a real Zcash mainnet wallet with it — a `u1…` receive address —
+ * and that wallet is still in his wallet list. It is named for what it is and
+ * otherwise left alone: not synced, not sent from, and not silently moved onto
+ * a SWARM chain, because its recovery phrase is the only thing that opens it
+ * and moving it would hide that.
+ */
+export const notASwarmWallet = (chain: string | undefined | null): ServerVerdict => {
+  const named = chain ? `"${chain}"` : "a network it does not name";
+  const whose =
+    chain === "main"
+      ? "upstream Zcash's mainnet"
+      : chain === "test"
+        ? "upstream Zcash's testnet"
+        : chain === "regtest"
+          ? "a local Zcash regtest chain"
+          : "not a network this wallet serves";
+  return {
+    ok: false,
+    reason: ServerRefusalEnum.wrongChain,
+    message:
+      `This is not a SWARM wallet. It was created on ${named}, which is ${whose}, so it is not ` +
+      `synced here and nothing can be sent from it. Its recovery phrase still opens it in a ` +
+      `wallet for that network. To use SWARM, create a new wallet.`,
+  };
+};
+
+/**
  * Whether the wallet may sync or send against `identity` while on `profile`.
  *
  * Pure: it performs no I/O and holds no state, so the refusal it returns is a
@@ -65,14 +96,9 @@ const OK: ServerVerdict = { ok: true };
 export function checkServerIdentity(
   profile: SwarmNetworkProfile | undefined,
   identity: ServerIdentity | undefined | null,
+  chain?: string,
 ): ServerVerdict {
-  if (!profile) {
-    return {
-      ok: false,
-      reason: ServerRefusalEnum.wrongChain,
-      message: "This wallet is not on a SWARM network, so its server cannot be checked against one.",
-    };
-  }
+  if (!profile) return notASwarmWallet(chain);
 
   if (!isProfileSelectable(profile)) {
     return { ok: false, reason: ServerRefusalEnum.profileNotLaunched, message: unselectableReason(profile) };
@@ -123,5 +149,5 @@ export function checkServerIdentityForChain(
   chain: string | undefined,
   identity: ServerIdentity | undefined | null,
 ): ServerVerdict {
-  return checkServerIdentity(swarmProfileFor(chain), identity);
+  return checkServerIdentity(swarmProfileFor(chain), identity, chain);
 }

@@ -17,14 +17,17 @@ import selectFastestServer, { RACE_CANDIDATES } from "../../utils/selectFastestS
 import Utils from "../../utils/utils";
 import {
   SWARM_ACTIVATION_HEIGHT,
-  SWARM_DEFAULT_SERVER,
+  SWARM_CHAIN,
   SWARM_NO_AUTOMATIC_REASON,
   SWARM_SERVER_PRESETS,
   isSwarmChain,
+  swarmDefaultServerFor,
   swarmPresetFor,
+  swarmPresetsForChain,
   swarmUnreachableMessage,
 } from "../../utils/swarmNetwork";
-import { SWARM_MAINNET_PROFILE } from "../../utils/networkProfiles";
+import { SWARM_MAINNET_PROFILE, SWARM_NETWORK_PROFILES, SWARM_TESTNET_PROFILE } from "../../utils/networkProfiles";
+import { ServerIdentity, checkServerIdentityForChain } from "../../utils/serverIdentity";
 import { native, ipcRenderer } from "../../electronBridge";
 import { useLocation } from "react-router-dom";
 import ScrollPaneTop from "../scrollPane/ScrollPane";
@@ -93,36 +96,26 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
   const [customServer, setCustomServer] = useState<string>("");
   const [listServer, setListServer] = useState<string>("");
 
-  const [servers, setServers] = useState<ServerClass[]>(serverUrisList().filter((s: ServerClass) => !s.obsolete));
+  // The SWARM endpoints, and nothing else: `serverUrisList()` no longer carries
+  // an upstream Zcash server. Fixed for the life of the modal, because SWARM has
+  // no registry to refresh from.
+  const [servers] = useState<ServerClass[]>(serverUrisList().filter((s: ServerClass) => !s.obsolete));
   const [serverExpanded, setServerExpanded] = useState<boolean>(false);
 
   const isSubmittingRef = useRef(false);
 
-  // Both public chains, once, when the modal opens — the picker offers either
-  // one and refetching on every chain switch would buy nothing. A chain whose
-  // request comes back empty keeps its static entries, so a silent registry
-  // degrades to the list we shipped rather than to an empty picker.
-  useEffect(() => {
-    let dropped = false;
-    const staticFor = (chain: ServerChainNameEnum) =>
-      serverUrisList().filter((s: ServerClass) => !s.obsolete && s.chain_name === chain);
-    (async () => {
-      const [mainLive, testLive] = await Promise.all([
-        fetchServerList(ServerChainNameEnum.mainChainName),
-        fetchServerList(ServerChainNameEnum.testChainName),
-      ]);
-      if (dropped) {
-        return;
-      }
-      setServers([
-        ...(mainLive.length > 0 ? mainLive : staticFor(ServerChainNameEnum.mainChainName)),
-        ...(testLive.length > 0 ? testLive : staticFor(ServerChainNameEnum.testChainName)),
-      ]);
-    })();
-    return () => {
-      dropped = true;
-    };
-  }, []);
+  // No registry fetch here any more.
+  //
+  // This used to ask the public lightwalletd registry for upstream Zcash's
+  // `main` and `test` server lists when the modal opened, and show them in a
+  // picker beside a Network dropdown that offered those same two chains. On
+  // 2026-09-26 an owner walked that path on the first SWARM mainnet build and
+  // created an upstream Zcash mainnet wallet — a `u1…` receive address in a
+  // wallet that has no business holding one. Neither the chains nor the servers
+  // are on offer now (see the Network dropdown below and
+  // `src/utils/serverUrisList.ts`), so there is nothing left to fetch: SWARM has
+  // no public server directory and `servers:fetchList` answers an empty list
+  // for its chains on purpose.
 
   const news = {
     new: "Create a New Wallet",
@@ -193,13 +186,44 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
     setListServer("");
   }, []);
 
+  /**
+   * The server the new wallet was just built against is asked which chain it
+   * serves, and the wallet is thrown away if the answer is not this one.
+   *
+   * It runs after `init_*` rather than before, because the addon can only read
+   * `GetLightdInfo` through a client and the client is what `init_*` makes.
+   * That is late but not too late: nothing has been registered, saved or
+   * synced at this point, so throwing sends the caller down the same path a
+   * failed init takes — the previous wallet is restored and the new one is
+   * never written into the wallet list.
+   *
+   * An unreachable or silent server is not a wrong server, and the sync gate
+   * (`RPC.checkServer`) asks again before anything is synced or sent, so this
+   * refuses only on an answer that is definitely another chain.
+   */
+  const assertServerServesSelectedChain = useCallback(async () => {
+    let identity: ServerIdentity | null = null;
+    try {
+      const infostr: string = await native.info_server();
+      identity = infostr ? (JSON.parse(infostr) as ServerIdentity) : null;
+    } catch (error) {
+      console.error(`Could not read the new wallet's server identity: ${error}`);
+      return;
+    }
+    if (!identity || !identity.chain_name) return;
+    const verdict = checkServerIdentityForChain(selectedChain || undefined, identity);
+    if (!verdict.ok) {
+      throw new Error(`${verdict.message} The wallet was not created.`);
+    }
+  }, [selectedChain]);
+
   const chooseAutomaticFor = useCallback(
     async (chain: ServerChainNameEnum) => {
       // Belt and braces: the radio is not rendered for this chain, so nothing
       // should reach here — and if a later change does, it lands on the
       // project endpoint instead of on the "no server could be reached" modal.
       if (isSwarmChain(chain)) {
-        chooseSwarmServer(customServer || SWARM_DEFAULT_SERVER);
+        chooseSwarmServer(customServer || swarmDefaultServerFor(chain));
         return;
       }
       setSelectedSelection(ServerSelectionEnum.auto);
@@ -233,7 +257,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
 
   const chooseAutomatic = useCallback(() => {
     if (isSwarmChain(selectedChain)) {
-      chooseSwarmServer(customServer || SWARM_DEFAULT_SERVER);
+      chooseSwarmServer(customServer || swarmDefaultServerFor(selectedChain));
       return;
     }
     if (mode !== "addnew") {
@@ -279,26 +303,33 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       const currServer: string = currentWallet ? currentWallet.uri : settings.serveruri;
       const currChain: ServerChainNameEnum = currentWallet ? currentWallet.chain_name : settings.serverchain_name;
       const currSelection: ServerSelectionEnum = currentWallet ? currentWallet.selection : settings.serverselection;
-      const safeChain = currChain || "";
+      // A chain that is not one of SWARM's cannot be opened here, and creating
+      // a wallet on one is refused below. Reading a foreign label out of an old
+      // settings file and putting it in the picker is how the build of
+      // 2026-09-26 ended up creating an upstream Zcash wallet, so the label is
+      // read through this: anything that is not a SWARM network lands on the
+      // network THIS BUILD is for.
+      const storedChain = currChain || "";
+      const safeChain: ServerChainNameEnum = isSwarmChain(storedChain)
+        ? (storedChain as ServerChainNameEnum)
+        : SWARM_CHAIN;
       const safeServer = currServer || "";
       const safeSelection = currSelection || "";
       setSelectedChain(safeChain);
-      if (isSwarmChain(safeChain)) {
-        // W-1, the mount half. Whatever the stored selection says — auto,
-        // list, or nothing at all on a profile that has never saved one — the
-        // project chain opens on `custom` with an endpoint already in the box.
-        // A stored URI is the user's own and is kept; otherwise the default
-        // preset. Applies in every mode, so "change server" from the settings
-        // screen lands the same way.
-        const storedIsForThisChain =
-          !!safeServer && (!!swarmPresetFor(safeServer) || safeSelection === ServerSelectionEnum.custom);
-        setAutoServer("");
-        chooseSwarmServer(storedIsForThisChain ? safeServer : SWARM_DEFAULT_SERVER);
-      } else {
-        initialServerValue(safeServer, safeChain, safeSelection as ServerSelectionEnum | "");
-        setSelectedServer(safeServer);
-        setSelectedSelection(safeSelection as ServerSelectionEnum | "");
-      }
+      // W-1, the mount half. Whatever the stored selection says — auto, list,
+      // or nothing at all on a profile that has never saved one — a SWARM chain
+      // opens on `custom` with an endpoint already in the box. A stored URI is
+      // the user's own and is kept when it belongs to this chain; otherwise the
+      // chain's own default preset, which on a mainnet build is the mainnet
+      // indexer. Applies in every mode, so "change server" from the settings
+      // screen lands the same way.
+      const storedIsForThisChain =
+        !!safeServer &&
+        storedChain === safeChain &&
+        (swarmPresetsForChain(safeChain).some((p) => p.uri === safeServer) ||
+          (safeSelection === ServerSelectionEnum.custom && !swarmPresetFor(safeServer)));
+      setAutoServer("");
+      chooseSwarmServer(storedIsForThisChain ? safeServer : swarmDefaultServerFor(safeChain));
       if (mode !== "addnew" && !!currentWallet) {
         // settings / delete: pre-fill with current wallet's data
         setAlias(currentWallet.alias);
@@ -399,6 +430,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       // A failed init rejects (typed error on the throw channel); the catch
       // below restores the previous wallet. Success is always a JSON payload.
       JSON.parse(result);
+      await assertServerServesSelectedChain();
       await createNextWallet(id, wallet_name, alias || `Wallet ${id}`);
 
       await ipcRenderer.invoke("saveSettings", { key: "serveruri", value: selectedServer });
@@ -433,6 +465,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       // A failed init rejects (typed error on the throw channel); the catch
       // below restores the previous wallet. Success is always a JSON payload.
       JSON.parse(result);
+      await assertServerServesSelectedChain();
       await createNextWallet(id, wallet_name, alias || `Wallet ${id}`);
 
       await ipcRenderer.invoke("saveSettings", { key: "serveruri", value: selectedServer });
@@ -509,6 +542,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       // A failed init rejects (typed error on the throw channel); the catch
       // below restores the previous wallet. Success is always a JSON payload.
       JSON.parse(result);
+      await assertServerServesSelectedChain();
       await createNextWallet(id, wallet_name, alias ? alias : `Wallet ${id}`);
 
       await ipcRenderer.invoke("saveSettings", { key: "serveruri", value: selectedServer });
@@ -574,6 +608,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
         );
       }
 
+      await assertServerServesSelectedChain();
       await createNextWallet(id, wallet_name, alias ? alias : wallet_name);
 
       await ipcRenderer.invoke("saveSettings", { key: "serveruri", value: selectedServer });
@@ -836,6 +871,23 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
         isSubmittingRef.current = false;
         return;
       }
+      // The last gate before a wallet is built: it must be on a SWARM network.
+      //
+      // Nothing on this screen offers another one any more, but a stored
+      // settings file survives downgrades and hand-editing, and the cost of
+      // being wrong here is a wallet on a chain this application cannot show,
+      // holding a seed phrase the user believes is SWARM's. That happened on
+      // 2026-09-26. It is refused rather than corrected, because silently
+      // moving someone's wallet to a different chain is its own surprise.
+      if (!isSwarmChain(selectedChain)) {
+        openErrorModal(
+          title,
+          `"${selectedChain}" is not a SWARM network. This wallet only creates wallets on ` +
+            `${SWARM_MAINNET_PROFILE.displayName} or ${SWARM_TESTNET_PROFILE.displayName}; choose one of them.`,
+        );
+        isSubmittingRef.current = false;
+        return;
+      }
     }
 
     // The project chain's server is asked whether it is there before a wallet
@@ -1031,7 +1083,11 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                   if (isSwarmChain(chain)) {
                     // W-1, the change half: the same landing as at mount.
                     setAutoServer("");
-                    chooseSwarmServer(swarmPresetFor(customServer) ? customServer : SWARM_DEFAULT_SERVER);
+                    chooseSwarmServer(
+                      swarmPresetsForChain(chain).some((p) => p.uri === customServer)
+                        ? customServer
+                        : swarmDefaultServerFor(chain),
+                    );
                     return;
                   }
                   // Automatic is a choice about how to pick, not about which
@@ -1065,12 +1121,21 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                 <option value="" disabled hidden>
                   Select...
                 </option>
-                <option value="main">{Utils.chainDisplayName(ServerChainNameEnum.mainChainName)}</option>
-                <option value="test">{Utils.chainDisplayName(ServerChainNameEnum.testChainName)}</option>
-                <option value="regtest">{Utils.chainDisplayName(ServerChainNameEnum.regtestChainName)}</option>
-                <option value="swarm-testnet">
-                  {Utils.chainDisplayName(ServerChainNameEnum.swarmTestnetChainName)}
-                </option>
+                {/*
+                  SWARM's two networks, and nothing else.
+
+                  `main`, `test` and `regtest` used to be here, and they are
+                  upstream Zcash. On 2026-09-26 an owner picked "Mainnet" on the
+                  first SWARM mainnet build, was given upstream's server list
+                  beside it, and created a real Zcash mainnet wallet: a `u1…`
+                  receive address, in a SWARM wallet, with a seed phrase he had
+                  written down believing it was SWARM's. The addon still decodes
+                  those chains — it has to, for addresses — but no screen offers
+                  them, `createNextWallet` refuses them, and the wallet is not
+                  a Zcash wallet by any route a person can walk.
+                */}
+                <option value="swarm-mainnet">{SWARM_MAINNET_PROFILE.displayName}</option>
+                <option value="swarm-testnet">{SWARM_TESTNET_PROFILE.displayName} — coins have no value</option>
               </select>
             </div>
           </div>
@@ -1277,14 +1342,28 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
                           className={cstyles.fieldselect}
                           value={swarmPresetFor(customServer) ? customServer : ""}
                           onChange={(e) => {
-                            if (e.target.value) chooseSwarmServer(e.target.value);
+                            const uri = e.target.value;
+                            if (!uri) return;
+                            // A preset names its network, so picking one picks
+                            // the chain too — choosing "SWARM Testnet" and
+                            // silently creating a mainnet wallet against a
+                            // testnet indexer is exactly the confusion this
+                            // screen has to stop. The chain cannot move once a
+                            // wallet exists, so in settings only this wallet's
+                            // own presets are offered.
+                            const preset = swarmPresetFor(uri);
+                            const chain = SWARM_NETWORK_PROFILES.find((p) => p.id === preset?.profileId)?.chainLabel;
+                            if (mode === "addnew" && chain && chain !== selectedChain) setSelectedChain(chain);
+                            chooseSwarmServer(uri);
                           }}
                         >
-                          {SWARM_SERVER_PRESETS.map((preset) => (
-                            <option key={preset.uri} value={preset.uri}>
-                              {`${preset.label} — ${preset.uri}`}
-                            </option>
-                          ))}
+                          {(mode === "addnew" ? SWARM_SERVER_PRESETS : swarmPresetsForChain(selectedChain)).map(
+                            (preset) => (
+                              <option key={preset.uri} value={preset.uri}>
+                                {`${preset.label} — ${preset.uri}`}
+                              </option>
+                            ),
+                          )}
                           <option value="">Another server (type it below)</option>
                         </select>
                       </div>

@@ -21,7 +21,13 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>SWARM Wallet (Testnet)</title>
+    <!--
+      The window's real title is set by the main process from the packaged
+      product name, and `page-title-updated` is refused, so this is only what a
+      browser tab would say. Kept free of a network name: the same document is
+      packaged into both the mainnet and the testnet build.
+    -->
+    <title>SWARM Wallet</title>
     <base href="./" />
   </head>
   <body>

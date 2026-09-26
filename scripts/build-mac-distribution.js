@@ -13,11 +13,12 @@ const archFlag = process.argv.indexOf('--arch');
 const arch = archFlag < 0 ? 'arm64' : process.argv[archFlag + 1];
 if (!['arm64', 'x64'].includes(arch)) throw new Error(`Unsupported Mac architecture: ${arch}`);
 const output = path.join(root, arch === 'x64' ? 'dist-mac-signed-x64' : 'dist-mac-signed');
-const versionSource = fs.readFileSync(path.join(root, 'src/version.ts'), 'utf8');
-const version = /const APP_VERSION = "([^"]+)"/.exec(versionSource)?.[1];
+const buildProfile = JSON.parse(fs.readFileSync(path.join(root, 'src/buildProfile.json'), 'utf8'));
+const identity = buildProfile.profiles[buildProfile.profile];
+const version = identity.version;
 const profile = process.env.APPLE_KEYCHAIN_PROFILE;
 const resume = process.argv.includes('--resume');
-const app = path.join(output, arch === 'x64' ? 'mac' : 'mac-arm64', 'SWARM Wallet Testnet.app');
+const app = path.join(output, arch === 'x64' ? 'mac' : 'mac-arm64', `${identity.executableName}.app`);
 const dmgName = `SWARM-Wallet-${version}-${arch}.dmg`;
 const zipName = `SWARM-Wallet-${version}-${arch}.zip`;
 const dmg = path.join(output, dmgName);
@@ -97,9 +98,9 @@ const binaries = {
   native_addon_sha256: sha(path.join(app, 'Contents/Resources/app.asar.unpacked/build/native.node')),
 };
 const manifest = {
-  product: 'SWARM Wallet (Testnet)',
+  product: identity.productName,
   version,
-  app_id: 'green.swarm.wallet.testnet',
+  app_id: identity.appId,
   platform: `darwin-${arch}`,
   signed: true,
   notarized: true,

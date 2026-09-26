@@ -5,15 +5,26 @@ import { SwarmIcon } from "../SwarmIcons";
 import { ContextApp } from "../../../context/ContextAppState";
 import { useCopy } from "../../common/useCopy";
 import { SWARM_TICKER } from "../../../utils/swarmNetwork";
+import { checkAddressForChain } from "../../../utils/swarmAddress";
 
 /**
  * Receive: the two addresses this wallet can be paid at, side by side, and
  * plain guidance on which one to hand over.
  *
- * The mockup shows `swm1…` addresses. This network does not issue those — a
- * unified address here starts `swarm1…` and a transparent one `tm…` — and a
- * screen that showed an address shape the chain never produces would teach the
+ * What those addresses look like depends on the network: `swm1…` and `s1…`/`s3…`
+ * on SWARM Mainnet, `swarm1…` and `tm…`/`t2…` on SwarmTestnet. A screen that
+ * showed an address shape the wallet's own chain never produces would teach the
  * user to mistrust the real one.
+ *
+ * And one shape is never shown at all. On 2026-09-26 an owner installed the
+ * first mainnet build, created a wallet through a screen that still offered
+ * upstream Zcash's chains, and this screen showed him a `u1…` unified address —
+ * a real Zcash mainnet address, in a SWARM wallet, which nothing in SWARM can
+ * pay and which he had every reason to read as his. So an address is checked
+ * against the wallet's own profile before it is drawn: anything else is named
+ * as the foreign thing it is, with no QR code and no copy button, because the
+ * only wrong thing to do with an address of unknown provenance is make it easy
+ * to hand out.
  *
  * The mining lines are the only guidance here that is not about addresses, and
  * they are here because the two miners in SWARM Node want different ones:
@@ -26,10 +37,18 @@ type AddressCardProps = {
   address: string | undefined;
   note: string;
   revealed?: boolean;
+  /** The chain the wallet is on, which decides which addresses belong to it. */
+  chain: string | undefined;
 };
 
-const AddressCard: React.FC<AddressCardProps> = ({ kicker, title, address, note, revealed }) => {
+const AddressCard: React.FC<AddressCardProps> = ({ kicker, title, address, note, revealed, chain }) => {
   const { copied, copy } = useCopy(1500);
+
+  // Undefined when there is nothing to check yet or when the chain is one this
+  // application has no rules for; a verdict that refuses is an address that
+  // does not belong to this wallet's network and must not be offered.
+  const verdict = address ? checkAddressForChain(address, chain) : undefined;
+  const foreign = !!address && (!verdict || !verdict.accepted);
 
   return (
     <section
@@ -39,7 +58,12 @@ const AddressCard: React.FC<AddressCardProps> = ({ kicker, title, address, note,
       <div className={revealed ? styles.chainKickerRevealed : styles.chainKicker}>{kicker}</div>
       <div className={styles.panelTitle}>{title}</div>
 
-      {address ? (
+      {foreign ? (
+        <div className={styles.empty} role="note">
+          This is not a SWARM address. This wallet was created on a network SWARM does not serve, so nothing sent to
+          it would arrive here. Create a new wallet to receive SWM.
+        </div>
+      ) : address ? (
         <>
           <div className={styles.qrFrame}>
             <QRCodeSVG value={address} size={168} includeMargin={false} level="M" />
@@ -70,7 +94,8 @@ const AddressCard: React.FC<AddressCardProps> = ({ kicker, title, address, note,
 };
 
 export const ReceiveScreen: React.FC = () => {
-  const { addressesUnified, addressesTransparent, valueTransfers } = useContext(ContextApp);
+  const { addressesUnified, addressesTransparent, valueTransfers, currentWallet } = useContext(ContextApp);
+  const chain = currentWallet?.chain_name;
   const [showAll, setShowAll] = useState(false);
 
   const unified = addressesUnified?.[0]?.encoded_address;
@@ -85,6 +110,7 @@ export const ReceiveScreen: React.FC = () => {
           kicker="SHIELDED · PRIVATE"
           title="Unified address"
           address={unified}
+          chain={chain}
           note="Safe to reuse. Payments to it are not linkable on the chain, and the sender can attach an encrypted memo."
         />
         <div className={styles.sideColumn}>
@@ -92,6 +118,7 @@ export const ReceiveScreen: React.FC = () => {
             kicker="TRANSPARENT · PUBLIC"
             title="Transparent address"
             address={transparent}
+            chain={chain}
             revealed
             note="Anything received here is visible on the chain until you shield it. Use it only when something cannot pay a unified address."
           />

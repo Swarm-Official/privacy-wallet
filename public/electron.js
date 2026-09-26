@@ -49,43 +49,62 @@ const { isOpenablePaymentUri } = require("./paymentUri");
 
 const STORAGE_KEY = "wallets";
 const isDev = !app.isPackaged;
-const isSwarmWalletBuild = require(path.join(app.getAppPath(), "package.json")).name === "swarm-wallet-testnet";
+const appPackage = require(path.join(app.getAppPath(), "package.json"));
+
+// The two networks this repository can be packaged for, and the identity each
+// package carries. `src/buildProfile.json` is the source; electron-builder
+// copies the selected record's `name`, `productName` and network label into the
+// packaged package.json, which is what this file reads. The main process runs
+// before any renderer module is loaded, so it cannot import the renderer's copy.
+//
+// Two app ids means two applications: the mainnet wallet installs beside a
+// testnet one rather than over it, and neither uninstall entry removes the
+// other. That is why the name has to be read rather than assumed — the build of
+// 2026-09-26 shipped the mainnet genesis under the testnet's name.
+const SWARM_PACKAGE_NAMES = ["swarm-wallet-testnet", "swarm-wallet-mainnet"];
+const isSwarmWalletBuild = SWARM_PACKAGE_NAMES.includes(appPackage.name);
 
 // What the window is called on this build. The renderer's document title says
 // "Zingo PC", which is upstream's and is not this application's name, so the
 // window carries its own and `page-title-updated` is refused below.
-const SWARM_WINDOW_TITLE = "SWARM Wallet (Testnet)";
+const SWARM_WINDOW_TITLE = appPackage.productName || "SWARM Wallet";
 
-// The chain and the server a fresh profile starts on. Two facts about this
-// network drive it: its indexer reports the label `swarm-testnet`, and the
-// public lightwalletd registry has nothing for it — so "Automatic" cannot
-// resolve a server here and the selection is `custom` from the first launch.
-// Mirrors src/utils/swarmNetwork.ts, which the renderer reads; this copy
-// exists because the main process runs before any renderer module is loaded.
-const SWARM_CHAIN_NAME = "swarm-testnet";
-
-// SWARM production. Named here so this file can refuse it, not so it can select
-// it: the network has no genesis until its launch ceremony, this build ships no
-// hash for it, and a wallet that cannot name a chain's first block cannot tell
-// that chain's indexer from any other. The renderer holds the same rule in
-// src/utils/networkProfiles.ts, where it is the single source; this copy exists
-// for the same reason SWARM_CHAIN_NAME's does — the main process runs before any
-// renderer module is loaded.
+// SWARM's two networks. The testnet's indexer reports `swarm-testnet` and the
+// mainnet's `swarm-mainnet`; neither has a public lightwalletd registry, so
+// "Automatic" cannot resolve a server on either and the selection is `custom`
+// from the first launch. Mirrors src/utils/networkProfiles.ts, which the
+// renderer reads.
 //
-// Note what is NOT here: "main". That label is upstream Zcash in the SDK, in the
-// vendored address crates and in the addon, and no SWARM network may reach it.
+// Note what is NOT here: "main", "test" and "regtest". Those labels are upstream
+// Zcash in the SDK, in the vendored address crates and in the addon, and no
+// SWARM network may reach them. On 2026-09-26 the create-a-wallet screen still
+// offered them and an owner ended up with a `u1…` Zcash wallet; the renderer no
+// longer offers them and this file never boots one.
+const SWARM_CHAIN_NAME = "swarm-testnet";
 const SWARM_MAINNET_CHAIN_NAME = "swarm-mainnet";
-const SELECTABLE_SWARM_CHAINS = [SWARM_CHAIN_NAME];
+const SELECTABLE_SWARM_CHAINS = [SWARM_CHAIN_NAME, SWARM_MAINNET_CHAIN_NAME];
+
+// Which network THIS build is for, and so where a fresh profile starts.
+const SWARM_BUILD_CHAIN = SELECTABLE_SWARM_CHAINS.includes(appPackage.swarmNetworkProfile)
+  ? appPackage.swarmNetworkProfile
+  : SWARM_CHAIN_NAME;
+
+const SWARM_TESTNET_SERVER = "https://lwd.swarm.green:443";
+const SWARM_MAINNET_SERVER = "https://lwd-main.swarm.green:8443";
+const SWARM_DEFAULT_SERVER = SWARM_BUILD_CHAIN === SWARM_MAINNET_CHAIN_NAME ? SWARM_MAINNET_SERVER : SWARM_TESTNET_SERVER;
+
+/** Whether a stored chain label is one of SWARM's. */
+const isSwarmChainName = (chain) => SELECTABLE_SWARM_CHAINS.includes(chain);
 
 // The chain a stored setting is allowed to boot on. A settings file survives
-// downgrades and hand-editing, so a label this build cannot serve is replaced by
-// the one it can rather than carried into the wallet.
+// downgrades, hand-editing and an earlier build that let a user pick upstream
+// Zcash, so a label this build cannot serve is replaced by the one it can
+// rather than carried into the wallet.
 const selectableChainOrFallback = (chain) => {
-  if (chain === SWARM_MAINNET_CHAIN_NAME && !SELECTABLE_SWARM_CHAINS.includes(chain)) {
-    console.log(`[network] ${chain} is not available in this build; falling back to ${SWARM_CHAIN_NAME}`);
-    return SWARM_CHAIN_NAME;
-  }
-  return chain;
+  if (!chain) return chain;
+  if (isSwarmChainName(chain)) return chain;
+  console.log(`[network] ${chain} is not a SWARM network; falling back to ${SWARM_BUILD_CHAIN}`);
+  return SWARM_BUILD_CHAIN;
 };
 
 // The project's official channels, and the only destinations this application
@@ -99,12 +118,11 @@ const SWARM_POLKIT_ACTION = "green.swarm.wallet.authenticate";
 const SWARM_SITE_URL = "https://swarm.green";
 const SWARM_SOURCE_URL = "https://github.com/Swarm-Official";
 const SWARM_ISSUES_URL = "https://github.com/Swarm-Official/privacy-wallet/issues";
-const SWARM_DEFAULT_SERVER = "https://lwd.swarm.green:443";
 
 if (isSwarmWalletBuild && !settings.getSync("all")) {
   settings.setSync("all", {
     serveruri: SWARM_DEFAULT_SERVER,
-    serverchain_name: SWARM_CHAIN_NAME,
+    serverchain_name: SWARM_BUILD_CHAIN,
     serverselection: "custom",
     currentwalletid: null,
   });
@@ -874,7 +892,7 @@ ipcMain.handle("auth:verify", async (_e, reason) => {
 // ── Keychain-backed requireDeviceAuth ─────────────────────────────────────
 // Missing or deleted entry is treated as true (auth required by default).
 // Only an explicit "false" stored by the user disables the feature.
-const KEYTAR_SERVICE = isSwarmWalletBuild ? "SWARM Wallet (Testnet)" : "Zingo PC";
+const KEYTAR_SERVICE = isSwarmWalletBuild ? SWARM_WINDOW_TITLE : "Zingo PC";
 const KEYTAR_ACCOUNT = "requireDeviceAuth";
 
 // In-process cache of the value so we only hit Keychain ONCE per session.
@@ -1156,7 +1174,7 @@ const serverRegistry = createServerRegistry({
 });
 
 ipcMain.handle("servers:fetchList", async (_e, chain) => {
-  if (chain === SWARM_CHAIN_NAME || settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
+  if (isSwarmChainName(chain) || isSwarmChainName(settings.getSync("all.serverchain_name"))) {
     return { ok: true, servers: [] };
   }
   const servers = await serverRegistry.load(chain);
@@ -1893,7 +1911,7 @@ async function attachCurrentWallet() {
 }
 
 function spawnProxy() {
-  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
+  if (isSwarmChainName(settings.getSync("all.serverchain_name"))) {
     setMixnetPhase("switched_off");
     return;
   }
@@ -2023,8 +2041,8 @@ ipcMain.handle("mixnet:get-status", async () => {
   return snapshot;
 });
 ipcMain.handle("mixnet:enable", async () => {
-  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
-    throw new Error("SWARM Testnet uses your configured node connection. Mixnet support for this network is pending.");
+  if (isSwarmChainName(settings.getSync("all.serverchain_name"))) {
+    throw new Error("SWARM uses your configured node connection. Mixnet support for this network is pending.");
   }
   mixnet.intent = "on";
   // Attaching again to a transport the wallet has given up on is the same
@@ -2051,7 +2069,7 @@ ipcMain.handle("mixnet:disable", async () => {
 // Called by the renderer on every wallet load: bring the new client onto the
 // session tunnel (or record the opt-out) without re-bootstrapping.
 ipcMain.handle("mixnet:attach-current", async () => {
-  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) {
+  if (isSwarmChainName(settings.getSync("all.serverchain_name"))) {
     cancelMixnetReconnect();
     killProxy();
     await requireNative("stop_mixnet").stop_mixnet();
@@ -2088,7 +2106,7 @@ const MIXNET_STALE_AFTER_MS = 5 * 60 * 1000;
 let mixnetBlurredAt = null;
 
 function restartMixnet(reason) {
-  if (settings.getSync("all.serverchain_name") === SWARM_CHAIN_NAME) return;
+  if (isSwarmChainName(settings.getSync("all.serverchain_name"))) return;
   if (mixnet.intent !== "on") return; // deliberately off: leave it off
   console.log(`[mixnet] restarting after ${reason}`);
   killProxy();
@@ -3231,7 +3249,7 @@ app.whenReady().then(async () => {
   // LoadingScreen asks, the request has usually already landed, so `auto` costs
   // the launch nothing. Testnet is fetched on demand — far rarer, and no reason
   // to spend a second clearnet request on every launch.
-  if (settings.getSync("all.serverchain_name") !== SWARM_CHAIN_NAME) {
+  if (!isSwarmChainName(settings.getSync("all.serverchain_name"))) {
     serverRegistry.load("main");
   }
 

@@ -12,7 +12,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const config = require("../configs/swarm-testnet-builder.cjs");
+const config = require("../configs/swarm-builder.cjs");
 const dist = path.resolve(__dirname, "../dist");
 
 // One extension per electron-builder target that this project builds. A target

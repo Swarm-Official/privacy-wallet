@@ -14,7 +14,7 @@ import {
   withGenesis,
   withoutGenesis,
 } from "./networkProfiles";
-import { SWARM_ACTIVATION_HEIGHT, SWARM_CHAIN, SWARM_DEFAULT_SERVER, SWARM_TICKER } from "./swarmNetwork";
+import { SWARM_ACTIVATION_HEIGHT, SWARM_TICKER } from "./swarmNetwork";
 
 const CEREMONY = "a".repeat(64);
 
@@ -23,8 +23,11 @@ describe("the SWARM testnet profile is exactly what this build already ships", (
   // them may change in the process. This test is the promise that they did not.
   it("keeps every value the wallet used before the profiles existed", () => {
     expect(SWARM_TESTNET_PROFILE.chainLabel).toBe("swarm-testnet");
-    expect(SWARM_TESTNET_PROFILE.chainLabel).toBe(SWARM_CHAIN);
-    expect(SWARM_TESTNET_PROFILE.defaultServer).toBe(SWARM_DEFAULT_SERVER);
+    // Not `SWARM_CHAIN` / `SWARM_DEFAULT_SERVER` any more: those two follow the
+    // network the build is packaged for, and on a mainnet build they are the
+    // mainnet's. What this test is about is that the testnet profile still says
+    // exactly what the wallet said before profiles existed.
+    expect(SWARM_TESTNET_PROFILE.defaultServer).toBe("https://lwd.swarm.green:443");
     expect(SWARM_TESTNET_PROFILE.ticker).toBe(SWARM_TICKER);
     expect(SWARM_TESTNET_PROFILE.activationHeight).toBe(SWARM_ACTIVATION_HEIGHT);
     expect(SWARM_TESTNET_PROFILE.unifiedHrp).toBe("swarm");

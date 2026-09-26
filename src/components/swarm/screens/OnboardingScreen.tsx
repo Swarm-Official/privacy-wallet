@@ -4,7 +4,7 @@ import styles from "../Swarm.module.css";
 import { SwarmIcon } from "../SwarmIcons";
 import SwarmMark from "../../logo/SwarmMark";
 import { ContextApp } from "../../../context/ContextAppState";
-import { SWARM_NETWORK_LABEL, SWARM_TICKER } from "../../../utils/swarmNetwork";
+import { SWARM_COINS_ARE_TEST_COINS, SWARM_NETWORK_LABEL, SWARM_TICKER } from "../../../utils/swarmNetwork";
 
 /**
  * The first thing someone sees, and the frame around making a wallet.
@@ -64,10 +64,23 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ children }) 
             SWARM shields every payment by default. Nobody can see your balance or who you pay — not the server this
             wallet talks to, and not anyone reading the chain.
           </p>
-          <p className={styles.onboardBody}>
-            These are test coins. {SWARM_TICKER} on {SWARM_NETWORK_LABEL} has no market and no value; it is here so the
-            network can be tried before it carries anything real.
-          </p>
+          {/*
+            Two networks, two different true sentences. Telling someone on
+            SWARM Mainnet that their coins "have no market and no value" would
+            be false about their money, and telling someone on the testnet the
+            opposite would be worse. The sentence follows the build's network.
+          */}
+          {SWARM_COINS_ARE_TEST_COINS ? (
+            <p className={styles.onboardBody}>
+              These are test coins. {SWARM_TICKER} on {SWARM_NETWORK_LABEL} has no market and no value; it is here so
+              the network can be tried before it carries anything real.
+            </p>
+          ) : (
+            <p className={styles.onboardBody}>
+              This is the live network. {SWARM_TICKER} on {SWARM_NETWORK_LABEL} is real: a payment cannot be reversed,
+              and the recovery phrase below is the only way back to it.
+            </p>
+          )}
 
           <div className={styles.onboardWarn}>
             <span className={styles.problemIcon}>

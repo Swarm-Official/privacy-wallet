@@ -7,6 +7,12 @@ name: SWARM wallet Linux and macOS test build
 on:
   workflow_dispatch:
     inputs:
+      network_profile:
+        description: 'Which SWARM network this build is for: swarm-testnet or swarm-mainnet'
+        required: false
+        default: 'swarm-testnet'
+        type: choice
+        options: [swarm-testnet, swarm-mainnet]
       verify_signed_intel:
         description: 'Verify the published signed Intel DMG on an Intel Mac'
         type: boolean
@@ -107,6 +113,15 @@ jobs:
         run: brew install protobuf
       - name: Install locked JavaScript dependencies
         run: yarn install --frozen-lockfile
+      # Which network this build is for, written into the tree before anything
+      # reads it: the renderer's branding, the version, the product name, the
+      # app id and the package file names all come from src/buildProfile.json.
+      # Default swarm-testnet, so a `swarm-unix-*` tag push keeps producing
+      # exactly what it produced before.
+      - name: Select the network this build is for
+        run: node scripts/set-build-profile.js
+        env:
+          SWARM_NETWORK_PROFILE: ${{ inputs.network_profile || 'swarm-testnet' }}
       - name: Validate the complete packaging configuration
         run: node scripts/check-swarm-package-config.js
       # Everything cheap that can refuse the build runs before the hour of
@@ -153,7 +168,7 @@ jobs:
       - name: Check the renderer shows no upstream naming
         run: node scripts/check-swarm-bundle-strings.js --renderer build/static/js
       - name: Package the unsigned test wallet
-        run: yarn electron-builder ${{ matrix.electron_flags }} --config configs/swarm-testnet-builder.cjs --publish never
+        run: yarn electron-builder ${{ matrix.electron_flags }} --config configs/swarm-builder.cjs --publish never
       - name: Check every declared package target was produced
         run: node scripts/check-swarm-dist-targets.js ${{ matrix.platform == 'linux' && 'linux' || 'mac' }}
       - name: Record whether the wallet server was reachable from this runner
@@ -198,7 +213,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: swarm-smoke-diagnostics-${{ matrix.platform }}
+          name: swarm-smoke-diagnostics-${{ matrix.platform }}-${{ inputs.network_profile || 'swarm-testnet' }}
           path: dist/smoke-diagnostics/
           if-no-files-found: ignore
           retention-days: 14
@@ -207,11 +222,12 @@ jobs:
           git rev-parse HEAD > dist/source-commit.txt
           cp native/Cargo.lock dist/Cargo.lock
           cp sdk-integration.json dist/sdk-integration.json
+          cp src/buildProfile.json dist/build-profile.json
           cd dist && shasum -a 256 *.AppImage *.deb *.dmg *.zip > SHA256SUMS 2>/dev/null || true
           cat dist/SHA256SUMS 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
-          name: swarm-wallet-${{ matrix.platform }}-unsigned-testnet
+          name: swarm-wallet-${{ matrix.platform }}-unsigned-${{ inputs.network_profile || 'swarm-testnet' }}
           path: |
             dist/*.AppImage
             dist/*.deb
@@ -221,6 +237,7 @@ jobs:
             dist/source-commit.txt
             dist/Cargo.lock
             dist/sdk-integration.json
+            dist/build-profile.json
           retention-days: 14
 
   verify-signed-intel:

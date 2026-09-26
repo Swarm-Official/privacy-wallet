@@ -9,7 +9,18 @@
 # outright on 24.04+ without an AppArmor profile. So the paths are ours.
 set -e
 
-APP_DIR='/opt/SWARM Wallet (Testnet)'
+# Two packages can be installed: the mainnet wallet lives in
+# /opt/SWARM Wallet and the testnet one in /opt/SWARM Wallet (Testnet). They
+# have different app ids and neither replaces the other, so this script — which
+# ships inside whichever .deb is being installed — finds the directory that
+# exists rather than naming one.
+for candidate in '/opt/SWARM Wallet' '/opt/SWARM Wallet (Testnet)'; do
+    if [ -d "$candidate" ]; then
+        APP_DIR="$candidate"
+        break
+    fi
+done
+[ -n "${APP_DIR:-}" ] || exit 0
 
 # 1. Chromium's setuid sandbox helper. Ubuntu 22.04+ and Debian 11+ restrict
 #    unprivileged user namespaces, and without this the renderer cannot start.
@@ -43,10 +54,12 @@ fi
 
 # 4. A name on the PATH. electron installs under a directory with spaces and
 #    parentheses, which is not somewhere anyone wants to type.
-BINARY="$APP_DIR/SWARM Wallet Testnet"
-if [ -f "$BINARY" ] && [ -d /usr/bin ]; then
-    ln -sf "$BINARY" /usr/bin/swarm-wallet
-fi
+for name in 'SWARM Wallet' 'SWARM Wallet Testnet'; do
+    if [ -f "$APP_DIR/$name" ] && [ -d /usr/bin ]; then
+        ln -sf "$APP_DIR/$name" /usr/bin/swarm-wallet
+        break
+    fi
+done
 
 # Upstream additionally rewrites the .desktop Exec line to route through a
 # wrapper that forwards `zcash:` payment links. This build deliberately

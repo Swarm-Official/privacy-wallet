@@ -29,8 +29,12 @@ const {
   assertLandingScreen,
 } = require("./swarm-first-screen");
 
-const PRODUCT = "SWARM Wallet (Testnet)";
-const EXECUTABLE = "SWARM Wallet Testnet";
+// Which network this build is for decides what it is called on disk, so the
+// names are read from the one file that says, not restated here.
+const BUILD_PROFILE = require("../src/buildProfile.json");
+const IDENTITY = BUILD_PROFILE.profiles[BUILD_PROFILE.profile];
+const PRODUCT = IDENTITY.productName;
+const EXECUTABLE = IDENTITY.executableName;
 const DEVTOOLS_PORT = 9333;
 const RENDER_TIMEOUT_MS = 120_000;
 
