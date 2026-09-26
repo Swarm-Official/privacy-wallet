@@ -69,6 +69,45 @@ Both belong to the same release as the SDK pin bump described below. Shipping
 the genesis without the pin would make the profile selectable against an addon
 that cannot open it.
 
+### The one command
+
+The manifest is the one the launch ceremony produces — the same file the node
+app embeds, rendered by `D:/privacy/scripts/swarm/render_mainnet_manifest.py`
+from the ceremony's five values:
+
+```sh
+node scripts/set-swarm-mainnet-launch.js D:/privacy/network/swarm-mainnet/manifest.json
+yarn test:run
+```
+
+`--check` prints what it would write and writes nothing. The script sets
+`SWARM_MAINNET_GENESIS`, `SWARM_MAINNET_SERVER` and the production record's
+`serverIsLive`, and records the same values with their provenance in
+`sdk/swarm-sdk-pin.json`. It touches nothing else — not the SDK commit, not the
+testnet profile, not an address rule.
+
+It refuses rather than guesses: a manifest that is not SWARM production
+(`identity.network_name` `SwarmMainnet`, `identity.network_kind`
+`SwarmProduction`, chain label `swarm-mainnet`), a genesis that is not 64
+lower-case hex characters, a genesis belonging to upstream Zcash or to the SWARM
+testnet, a `light_wallet_servers[0]` that is not the reserved
+`lwd-main.swarm.green:8443`, or a source file whose two lines are not where it
+expects them — each is an error, and nothing is written.
+
+**No test changes go in that commit.** The unlaunched behaviour is asserted
+against `withoutGenesis(SWARM_MAINNET_PROFILE)`, so it holds either way, and
+what the build currently ships is one explicit assertion —
+"is either wholly unlaunched or wholly launched, never half" in
+`src/utils/networkProfiles.test.ts` — which simply takes its other branch. A
+release step that has to rewrite its own tests is a release step nobody can
+review.
+
+Rehearsed on 2026-09-26 with the disposable rehearsal network's values
+(`D:/privacy/network/swarm-rehearsal-main/manifest.json`, genesis
+`007e6673…ce65`, three throwaway `s3…` addresses): the script set both
+constants, and the whole suite — **117 suites, 1589 tests** — passed both with
+the values applied and after they were reverted. They are not committed.
+
 ## The addon contract
 
 The addon's chain hint is the single string that decides the network. Today:

@@ -12,6 +12,7 @@ import {
   swarmProfileFor,
   unselectableReason,
   withGenesis,
+  withoutGenesis,
 } from "./networkProfiles";
 import { SWARM_ACTIVATION_HEIGHT, SWARM_CHAIN, SWARM_DEFAULT_SERVER, SWARM_TICKER } from "./swarmNetwork";
 
@@ -62,9 +63,11 @@ describe("the SWARM mainnet profile", () => {
     }
   });
 
-  it("carries a server placeholder that is marked as not live", () => {
+  // The host name is reserved and is the only one the launch step will write;
+  // whether it is LIVE depends on whether this build has launched, which is
+  // asserted once, below, in "what this build ships for SWARM production".
+  it("names the reserved production indexer", () => {
     expect(SWARM_MAINNET_PROFILE.defaultServer).toBe("lwd-main.swarm.green:8443");
-    expect(SWARM_MAINNET_PROFILE.serverIsLive).toBe(false);
   });
 
   it("accepts no legacy address encodings, having no history", () => {
@@ -72,31 +75,68 @@ describe("the SWARM mainnet profile", () => {
   });
 });
 
+// The unlaunched BEHAVIOUR, asserted against a profile that is explicitly
+// unlaunched rather than against whatever this build happens to ship. These
+// hold before the launch ceremony and after it.
 describe("a mainnet with no genesis is not selectable", () => {
-  it("ships no genesis and no placeholder", () => {
-    expect(SWARM_MAINNET_GENESIS).toBeNull();
-    expect(SWARM_MAINNET_PROFILE.genesis).toBeNull();
+  const unlaunched = withoutGenesis(SWARM_MAINNET_PROFILE);
+
+  it("carries no genesis and no placeholder", () => {
+    expect(unlaunched.genesis).toBeNull();
   });
 
   it("is not offered", () => {
-    expect(isProfileSelectable(SWARM_MAINNET_PROFILE)).toBe(false);
+    expect(isProfileSelectable(unlaunched)).toBe(false);
     expect(isProfileSelectable(SWARM_TESTNET_PROFILE)).toBe(true);
-    expect(selectableSwarmProfiles()).toEqual([SWARM_TESTNET_PROFILE]);
   });
 
   it("says why, naming the ceremony rather than reading as a bug", () => {
-    const why = unselectableReason(SWARM_MAINNET_PROFILE);
+    const why = unselectableReason(unlaunched);
     expect(why).toContain("SWARM Mainnet");
     expect(why).toContain("genesis");
     expect(unselectableReason(SWARM_TESTNET_PROFILE)).toBe("");
   });
 
   it("refuses to produce a chain hint the addon could act on", () => {
-    expect(() => chainHintFor(SWARM_MAINNET_PROFILE)).toThrow(/genesis/);
+    expect(() => chainHintFor(unlaunched)).toThrow(/genesis/);
+  });
+});
+
+// What THIS build ships, in one place. The launch commit — one run of
+// `node scripts/set-swarm-mainnet-launch.js <manifest>` — swaps which of these
+// two runs, and changes no test anywhere else. Whichever is not this build's
+// state is skipped rather than asserted the other way round, because
+// "skipped: this build has not launched" is the honest reading.
+const BUILD_HAS_LAUNCHED = SWARM_MAINNET_GENESIS !== null;
+const whileUnlaunched = BUILD_HAS_LAUNCHED ? it.skip : it;
+const onceLaunched = BUILD_HAS_LAUNCHED ? it : it.skip;
+
+describe("what this build ships for SWARM production", () => {
+  it("agrees with itself about whether it has a genesis at all", () => {
+    expect(SWARM_MAINNET_PROFILE.genesis).toBe(SWARM_MAINNET_GENESIS);
   });
 
-  it("falls back to the chain this build can serve when settings hold it", () => {
+  whileUnlaunched("offers no mainnet, and rewrites a stored mainnet label", () => {
+    expect(isProfileSelectable(SWARM_MAINNET_PROFILE)).toBe(false);
+    expect(selectableSwarmProfiles()).toEqual([SWARM_TESTNET_PROFILE]);
+    // A settings file survives a downgrade, so a stored production label is
+    // rewritten back to the chain this build can actually serve.
     expect(selectableChainOrFallback("swarm-mainnet")).toBe("swarm-testnet");
+    expect(SWARM_MAINNET_PROFILE.serverIsLive).toBe(false);
+  });
+
+  onceLaunched("offers a mainnet that is selectable, live, and hinted with its genesis", () => {
+    expect(SWARM_MAINNET_GENESIS).toMatch(/^[0-9a-f]{64}$/);
+    expect(isProfileSelectable(SWARM_MAINNET_PROFILE)).toBe(true);
+    expect(selectableSwarmProfiles()).toEqual([SWARM_TESTNET_PROFILE, SWARM_MAINNET_PROFILE]);
+    expect(selectableChainOrFallback("swarm-mainnet")).toBe("swarm-mainnet");
+    expect(chainHintFor(SWARM_MAINNET_PROFILE)).toBe(`swarm-mainnet:${SWARM_MAINNET_GENESIS}`);
+    // A launched network whose indexer is not deployed would be a profile the
+    // wallet can select and cannot reach.
+    expect(SWARM_MAINNET_PROFILE.serverIsLive).toBe(true);
+  });
+
+  it("leaves the testnet fallback and the upstream chains alone either way", () => {
     expect(selectableChainOrFallback("swarm-testnet")).toBe("swarm-testnet");
     // Upstream chains are not this function's business.
     expect(selectableChainOrFallback("main")).toBe("main");
@@ -111,7 +151,7 @@ describe("a launched mainnet", () => {
   it("becomes selectable once a release ships the hash", () => {
     expect(isProfileSelectable(launched)).toBe(true);
     // And the shipped profile is untouched by having built one.
-    expect(SWARM_MAINNET_PROFILE.genesis).toBeNull();
+    expect(SWARM_MAINNET_PROFILE.genesis).toBe(SWARM_MAINNET_GENESIS);
   });
 
   it("puts the genesis in the addon's chain hint, because the SDK needs it", () => {

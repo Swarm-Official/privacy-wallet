@@ -1,6 +1,7 @@
 import RPC from "./rpc";
 import { native } from "../electronBridge";
 import { ServerChainNameEnum, WalletType } from "../components/appstate";
+import { SWARM_MAINNET_PROFILE } from "../utils/networkProfiles";
 
 jest.mock("../electronBridge", () => ({
   native: {
@@ -34,8 +35,22 @@ function client(current: WalletType | null) {
   return { rpc, error };
 }
 
-const info = (chain: string) =>
-  JSON.stringify({ chain_name: chain, server_uri: "https://lwd.swarm.green:443/", latest_block_height: 10 });
+const info = (chain: string, genesis?: string) =>
+  JSON.stringify({
+    chain_name: chain,
+    server_uri: "https://lwd.swarm.green:443/",
+    latest_block_height: 10,
+    ...(genesis ? { genesis_hash: genesis } : {}),
+  });
+
+// Whether SWARM production is reachable at all is a property of the build, not
+// of the gate: before the launch ceremony `SWARM_MAINNET_GENESIS` is null and
+// every production server is refused; afterwards the gate behaves like any
+// other chain. Both are asserted, so the launch commit rewrites no test here.
+const MAINNET_LAUNCHED = SWARM_MAINNET_PROFILE.genesis !== null;
+const whileUnlaunched = MAINNET_LAUNCHED ? it.skip : it;
+const onceLaunched = MAINNET_LAUNCHED ? it : it.skip;
+const mainnetInfo = () => info("swarm-mainnet", SWARM_MAINNET_PROFILE.genesis ?? undefined);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -59,12 +74,19 @@ describe("before syncing", () => {
     expect(error).toHaveBeenCalledWith("Sync", expect.stringContaining("SWARM Testnet"));
   });
 
-  it("refuses a wallet whose chain this build cannot serve at all", async () => {
-    (native.info_server as jest.Mock).mockResolvedValue(info("swarm-mainnet"));
+  whileUnlaunched("refuses a wallet whose chain this build cannot serve at all", async () => {
+    (native.info_server as jest.Mock).mockResolvedValue(mainnetInfo());
     const { rpc, error } = client(wallet(ServerChainNameEnum.swarmMainnetChainName));
     await rpc.refreshSync();
     expect(native.run_sync).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith("Sync", expect.stringContaining("genesis"));
+  });
+
+  onceLaunched("syncs a mainnet wallet against a mainnet server once this build has launched", async () => {
+    (native.info_server as jest.Mock).mockResolvedValue(mainnetInfo());
+    const { rpc } = client(wallet(ServerChainNameEnum.swarmMainnetChainName));
+    await rpc.refreshSync();
+    expect(native.run_sync).toHaveBeenCalled();
   });
 
   // The upstream chains are not this change's business, and a gate there would
@@ -113,10 +135,19 @@ describe("before sending", () => {
     expect(native.send).not.toHaveBeenCalled();
   });
 
-  it("refuses to send from a wallet on a network that has not launched", async () => {
-    (native.info_server as jest.Mock).mockResolvedValue(info("swarm-mainnet"));
+  whileUnlaunched("refuses to send from a wallet on a network that has not launched", async () => {
+    (native.info_server as jest.Mock).mockResolvedValue(mainnetInfo());
     const { rpc } = client(wallet(ServerChainNameEnum.swarmMainnetChainName));
     await expect(rpc.sendTransaction([{ address: "s1MCk", amount: 1 } as never])).rejects.toThrow(/genesis/);
     expect(native.send).not.toHaveBeenCalled();
+  });
+
+  // Once launched, the identity gate lets a mainnet wallet past and the send
+  // succeeds or fails on its own merits — never for "this network has no
+  // genesis", which is the refusal this gate is about.
+  onceLaunched("stops refusing the send for want of a genesis once this build has launched", async () => {
+    (native.info_server as jest.Mock).mockResolvedValue(mainnetInfo());
+    const { rpc } = client(wallet(ServerChainNameEnum.swarmMainnetChainName));
+    await expect(rpc.sendTransaction([{ address: "s1MCk", amount: 1 } as never])).rejects.not.toThrow(/genesis/);
   });
 });

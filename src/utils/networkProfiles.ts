@@ -242,6 +242,24 @@ export const withGenesis = (profile: SwarmNetworkProfile, genesis: string): Swar
 };
 
 /**
+ * A copy of `profile` with no genesis, for the tests that have to exercise the
+ * unlaunched state.
+ *
+ * The mirror of `withGenesis`, and it exists for the same reason: the state a
+ * test asserts must not be the state the build happens to be in. Before this,
+ * every "SWARM production is not selectable" test read the shipped constant,
+ * so the release that fills `SWARM_MAINNET_GENESIS` in would have had to
+ * rewrite ten tests in the same commit — and a release step that edits its own
+ * tests is a release step nobody can review. The unlaunched BEHAVIOUR is now
+ * tested against this, and what the build currently ships is one separate,
+ * explicit assertion.
+ */
+export const withoutGenesis = (profile: SwarmNetworkProfile): SwarmNetworkProfile => ({
+  ...profile,
+  genesis: null,
+});
+
+/**
  * The chain label a build may actually store and boot on.
  *
  * A settings file can hold anything — it is a JSON file on the user's disk, it

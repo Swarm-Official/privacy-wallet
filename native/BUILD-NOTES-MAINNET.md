@@ -1,9 +1,16 @@
 # Building the addon against the SWARM production SDK
 
-**Status: the Linux addon has now been built and tested** (2026-09-26, see
-"Linux build, verified" at the end of this file). The rest — Windows, macOS,
-CI — is still untried, and the paragraph below still describes how the notes
-were written.
+**Status: built and green everywhere** (2026-09-26). The Linux addon was built
+and tested on the build host ("Linux build, verified" at the end of this file),
+and CI then compiled the addon against this pin on all four platforms at wallet
+commit `d08e17e2`:
+
+* Windows — https://github.com/Swarm-Official/privacy-wallet/actions/runs/36204252054
+* Linux, macOS arm64, macOS x64 — https://github.com/Swarm-Official/privacy-wallet/actions/runs/36204253710
+
+Nothing below is untried any more. The paragraph that follows records how the
+notes were first written, and is kept because it explains why they read as they
+do.
 
 **Status at the time of writing: none of this had been run.** The commit that added these notes was
 authored with no compiler available — the build host's memory was fully taken by
@@ -12,16 +19,19 @@ vendored crates, the `[patch.crates-io]` table, the lockfile edits and the new
 `swarm-mainnet:<genesis>` chain hint have been written and read against their
 sources, and nothing more. Treat every command below as untried.
 
-## Before anything: push the SDK branch
+## The SDK branch: pushed
 
-`native/Cargo.toml` and `sdk/swarm-sdk-pin.json` now name SDK revision
-`d9f1a5b888067724b61b2fae46307ed56b4b1e0a`. That revision exists **only** on the
-local branch `codex/mainnet-sdk-identity-20260925`, in the worktree
-`C:/Users/o5o-o/swarm-work/codex-mainnet-sdk-identity-20260925`. It has not been
-pushed to `Swarm-Official/privacy-zingolib`.
+`native/Cargo.toml` and `sdk/swarm-sdk-pin.json` name SDK revision
+`d9f1a5b888067724b61b2fae46307ed56b4b1e0a`. **It is pushed**: confirmed
+2026-09-26 as the head of branch `codex/mainnet-sdk-identity-20260925` in
+`Swarm-Official/privacy-zingolib`. `cargo fetch` resolves it and
+`actions/checkout` checks it out; the four CI builds above did both.
 
-Until it is pushed, nothing here can start: `cargo fetch` cannot resolve the
-revision, and `actions/checkout` cannot check it out. Push the SDK branch first.
+This section used to say the opposite, and everything downstream of it was
+written on that assumption. Where a later paragraph still says "once it is
+pushed" or predicts a fetch failure for want of the revision, read it as history
+— the "Linux build, verified" section at the end records what actually
+happened, including that `native/Cargo.lock` turned out to need no change.
 
 ## Expect the lockfile to move
 
@@ -193,7 +203,12 @@ yarn test:run
 
 ## Windows and macOS addons, via CI
 
-After the SDK branch is pushed, both workflows can run: they already name
+**Both have run and both passed** — the two runs linked at the top of this
+file, at wallet commit `d08e17e2`, with the addon compiled against `d9f1a5b8`
+on Windows, Linux, macOS arm64 and macOS x64. The rest of this section is the
+instructions for running them again.
+
+Both workflows already name
 `d9f1a5b8` as the SDK checkout ref (this commit bumped
 `.github/workflows/swarm-wallet-unix.yml` — both the `SWARM_SDK_REV` env and the
 `actions/checkout` `ref` — and `.github/workflows/swarm-wallet-windows.yml`).

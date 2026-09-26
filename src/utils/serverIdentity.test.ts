@@ -1,4 +1,4 @@
-import { SWARM_MAINNET_PROFILE, SWARM_TESTNET_PROFILE, withGenesis } from "./networkProfiles";
+import { SWARM_MAINNET_PROFILE, SWARM_TESTNET_PROFILE, withGenesis, withoutGenesis } from "./networkProfiles";
 import { ServerRefusalEnum, checkServerIdentity, checkServerIdentityForChain } from "./serverIdentity";
 
 const CEREMONY = "b".repeat(64);
@@ -78,9 +78,11 @@ describe("a server with the right label but the wrong first block", () => {
 });
 
 describe("a profile that has not launched", () => {
+  // Explicitly unlaunched, not "whatever this build ships": the release that
+  // fills the genesis in must not have to rewrite this test.
   it("refuses every server, however the server identifies itself", () => {
     const info = lightdInfo({ chain_name: "swarm-mainnet", genesis_hash: CEREMONY });
-    const verdict = checkServerIdentity(SWARM_MAINNET_PROFILE, info);
+    const verdict = checkServerIdentity(withoutGenesis(SWARM_MAINNET_PROFILE), info);
     expect(verdict.ok).toBe(false);
     if (verdict.ok) return;
     expect(verdict.reason).toBe(ServerRefusalEnum.profileNotLaunched);
