@@ -45,7 +45,7 @@ export enum SwarmProfileIdEnum {
  * A release fills this in, from the network manifest, in the same commit that
  * fills in `SWARM_MAINNET_SERVER` below.
  */
-export const SWARM_MAINNET_GENESIS: string | null = null;
+export const SWARM_MAINNET_GENESIS: string | null = "01c34428b9e67cdd8345e0b365aaa37dd8d2d65d3869e0e5d77d567f2c39afdd";
 
 /**
  * Where a SWARM production wallet would look for its indexer.
@@ -152,7 +152,7 @@ const MAINNET: SwarmNetworkProfile = {
   texHrp: "texswm",
   transparentPrefixes: ["s1", "s3"],
   defaultServer: SWARM_MAINNET_SERVER,
-  serverIsLive: false,
+  serverIsLive: true,
   grpcPort: 9068,
   genesis: SWARM_MAINNET_GENESIS,
   sdkChainType: "SwarmMainnet",

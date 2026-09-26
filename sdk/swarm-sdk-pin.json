@@ -7,7 +7,7 @@
   "chainName": "swarm-testnet",
   "genesis": "045993f5c91ea160c7ebda573dd97b0016816bca68d395bfff202779b88e2a28",
   "genesisIsPlaceholder": false,
-  "chainNameNote": "chainName and genesis are SwarmTestnet's, and stay SwarmTestnet's: scripts/check-swarm-sdk-pin.js reads SWARM_TESTNET_NAME and SWARM_TESTNET_GENESIS out of the pinned SDK's zingolib/src/config.rs, and d9f1a5b8 leaves both constants exactly as ef08aa25 left them. SWARM production is a separate profile in that same revision \u2014 ChainType::SwarmMainnet(SwarmMainnetGenesis) \u2014 and deliberately has no genesis constant to pin: its genesis is supplied per wallet through the `swarm-mainnet:<64 hex>` chain hint. There is nothing here for this file to record until the launch ceremony produces one.",
+  "chainNameNote": "chainName and genesis are SwarmTestnet's, and stay SwarmTestnet's: scripts/check-swarm-sdk-pin.js reads SWARM_TESTNET_NAME and SWARM_TESTNET_GENESIS out of the pinned SDK's zingolib/src/config.rs, and d9f1a5b8 leaves both constants exactly as ef08aa25 left them. SWARM production is a separate profile in that same revision — ChainType::SwarmMainnet(SwarmMainnetGenesis) — and deliberately has no genesis constant to pin: its genesis is supplied per wallet through the `swarm-mainnet:<64 hex>` chain hint. There is nothing here for this file to record until the launch ceremony produces one.",
   "manifest": {
     "source": "network/swarm-testnet/manifest.json in the project repository",
     "schema": "swarm-network-manifest/1",
@@ -33,12 +33,16 @@
     "CI GREEN ON FOUR PLATFORMS at wallet commit d08e17e2, 2026-09-26, with the addon compiled against this pin: Windows https://github.com/Swarm-Official/privacy-wallet/actions/runs/36204252054 (windows-wallet), Linux + macOS arm64 + macOS x64 https://github.com/Swarm-Official/privacy-wallet/actions/runs/36204253710."
   ],
   "mainnet": {
-    "state": "NOT LAUNCHED",
+    "state": "LAUNCHED",
     "chainLabel": "swarm-mainnet",
     "sdkChainType": "ChainType::SwarmMainnet(SwarmMainnetGenesis)",
-    "genesis": null,
+    "genesis": "01c34428b9e67cdd8345e0b365aaa37dd8d2d65d3869e0e5d77d567f2c39afdd",
     "server": "lwd-main.swarm.green:8443",
-    "serverIsLive": false,
-    "note": "SWARM production has no genesis constant in the SDK to pin: its genesis is supplied per wallet through the `swarm-mainnet:<64 hex>` chain hint, and ChainType::try_from(\"swarm-mainnet\") is deliberately an error without one. The launch values are set in ONE step by `node scripts/set-swarm-mainnet-launch.js <rendered manifest>`, which fills SWARM_MAINNET_GENESIS and SWARM_MAINNET_SERVER in src/utils/networkProfiles.ts and this block. See docs/SWARM-NETWORK-PROFILES.md."
+    "serverIsLive": true,
+    "genesisTimeUtc": "2026-09-26T12:19:57Z",
+    "manifestSource": "D:/privacy/network/swarm-mainnet/manifest.json",
+    "manifestSha256": "c5ee6cf83985a529a46d32366eae82d939c23c2b38ffb85541b74c1e96f76d25",
+    "chainHint": "swarm-mainnet:01c34428b9e67cdd8345e0b365aaa37dd8d2d65d3869e0e5d77d567f2c39afdd",
+    "note": "Set by scripts/set-swarm-mainnet-launch.js from the launch-ceremony manifest. The chain hint is what the addon is given; ChainType::try_from(\"swarm-mainnet\") without a genesis remains an error."
   }
 }
