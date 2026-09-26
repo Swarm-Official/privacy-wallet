@@ -1,6 +1,11 @@
 # Building the addon against the SWARM production SDK
 
-**Status: none of this has been run.** The commit that added these notes was
+**Status: the Linux addon has now been built and tested** (2026-09-26, see
+"Linux build, verified" at the end of this file). The rest — Windows, macOS,
+CI — is still untried, and the paragraph below still describes how the notes
+were written.
+
+**Status at the time of writing: none of this had been run.** The commit that added these notes was
 authored with no compiler available — the build host's memory was fully taken by
 another agent's release builds and every local disk was near full — so the four
 vendored crates, the `[patch.crates-io]` table, the lockfile edits and the new
@@ -220,3 +225,33 @@ build above before dispatching CI:
 One loose end left alone on purpose: `docs/MAC-DISTRIBUTION.md` still names
 `ef08aa25`, because it records a build that was actually verified at that
 revision. Update it when a Mac build is verified at `d9f1a5b8`, not before.
+
+## Linux build, verified
+
+2026-09-26, on the mainnet build host, in a container built from
+`node:24-bookworm` (the Node the workflows use) with rustup `1.96.0`,
+`protobuf-compiler` and `yarn@1.22.22`; `RUSTFLAGS='--cfg zcash_unstable="nu6.3"'`.
+
+- `cargo fetch --locked --manifest-path native/Cargo.toml` fails exactly as
+  predicted, and for the predicted reason: `upload-pack: not our ref
+  d9f1a5b888067724b61b2fae46307ed56b4b1e0a`. The SDK branch is still unpushed,
+  so this is the one thing that blocks both CI workflows.
+- With the SDK checkout supplied locally through a container-only
+  `[patch."https://github.com/Swarm-Official/privacy-zingolib"]` path table
+  (never committed), `cargo fetch` resolves with **no change to
+  `native/Cargo.lock`**: the hand-edited lock was already correct. The only
+  difference cargo writes is that the seven SDK crates lose their `source =
+  "git+...?rev=d9f1a5b8..."` line while patched to paths. `zcash_pool_migration`
+  stays at the crates.io `0.1.0` the lock already pinned, so the re-pin above is
+  not needed on this path — it remains the right guard against a bare
+  `cargo update`.
+- `yarn install --frozen-lockfile` needs Node >= 22.12 (`@electron/notarize`),
+  so `node:20` needs `--ignore-engines`; `node:24` does not.
+- `zingolib`'s `build.rs` writes the downloaded sapling params back into the SDK
+  checkout, so that mount cannot be read-only.
+- `yarn neon` then succeeds and writes `src/native.node`.
+- `node scripts/check-swarm-prefix-native.js`: passed (legacy decode, canonical
+  SWARM encoding, mixed-case/checksum rejection).
+- `node scripts/test.js --watchAll=false`: **117 suites, 1588 tests, all
+  passing**, including `src/utils/uris.test.js` (10) against the built addon and
+  the four contract suites (77).
