@@ -1,16 +1,36 @@
-import { PerformanceLevelEnum, ServerChainNameEnum } from "./components/appstate";
+import { PerformanceLevelEnum } from "./components/appstate";
+
+/**
+ * What the addon's first argument actually is: a chain HINT, not a chain label.
+ *
+ * It was typed `ServerChainNameEnum`, and that type was the bug. For `main`,
+ * `test`, `regtest` and `swarm-testnet` the hint and the label happen to be
+ * the same string, so the type was true by coincidence for four years. SWARM
+ * production broke the coincidence — its hint is `swarm-mainnet:<64 hex>`,
+ * because `ChainType::SwarmMainnet` carries the genesis and the SDK gives it
+ * no default — and the old type then made every call site that passed a bare
+ * label typecheck cleanly. The owner met the result on 2026-09-26:
+ *
+ *   initializing wallet: 'swarm-mainnet' does not name a network.
+ *
+ * Typed as a plain string so nothing can pass a label here believing the
+ * compiler checked it. Build the value with `nativeChainHint` in
+ * src/utils/networkProfiles.ts; `src/utils/nativeChainHint.test.ts` fails the
+ * build if a call site does anything else.
+ */
+export type SwarmChainHint = string;
 
 export function deinitialize(): string;
 export function wallet_exists(
   server_uri: string,
-  chain_hint: ServerChainNameEnum,
+  chain_hint: SwarmChainHint,
   performance_level: PerformanceLevelEnum,
   min_confirmations: number,
   wallet_name: string,
 ): boolean;
 export function init_new(
   server_uri: string,
-  chain_hint: ServerChainNameEnum,
+  chain_hint: SwarmChainHint,
   performance_level: PerformanceLevelEnum,
   min_confirmations: number,
   wallet_name: string,
@@ -19,7 +39,7 @@ export function init_from_seed(
   seed: string,
   birthday: number,
   server_uri: string,
-  chain_hint: ServerChainNameEnum,
+  chain_hint: SwarmChainHint,
   performance_level: PerformanceLevelEnum,
   min_confirmations: number,
   wallet_name: string,
@@ -28,14 +48,14 @@ export function init_from_ufvk(
   ufvk: string,
   birthday: number,
   server_uri: string,
-  chain_hint: ServerChainNameEnum,
+  chain_hint: SwarmChainHint,
   performance_level: PerformanceLevelEnum,
   min_confirmations: number,
   wallet_name: string,
 ): string;
 export function init_from_b64(
   server_uri: string,
-  chain_hint: ServerChainNameEnum,
+  chain_hint: SwarmChainHint,
   performance_level: PerformanceLevelEnum,
   min_confirmations: number,
   wallet_name: string,
@@ -110,7 +130,7 @@ export function execute_due_parts(spacing_ms: number): Promise<string>;
 export function execute_due_parts_status(): Promise<string>;
 export function delete_wallet(
   server_uri: string,
-  chain_hint: ServerChainNameEnum,
+  chain_hint: SwarmChainHint,
   performance_level: PerformanceLevelEnum,
   min_confirmations: number,
   wallet_name: string,

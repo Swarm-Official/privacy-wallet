@@ -9,6 +9,7 @@ import { SwapStore, readCurrentWalletFingerprint } from "../../swap";
 import { useSwapService } from "../../context/ContextSwapService";
 import selectFastestServer from "../../utils/selectFastestServer";
 import { SWARM_NO_AUTOMATIC_REASON, SWARM_SERVER_PRESETS, swarmDefaultServerFor } from "../../utils/swarmNetwork";
+import { SWARM_MAINNET_PROFILE } from "../../utils/networkProfiles";
 
 jest.mock("../../electronBridge");
 jest.mock("../../utils/fetchServerList");
@@ -345,9 +346,19 @@ describe("AddNewWallet on the project chain", () => {
 
     // The chain hint is the single string that decides the ChainType, and so
     // decides whether the first address is `swm1…` or something else entirely.
+    // It is NOT the bare label: `ChainType::SwarmMainnet` carries the genesis
+    // and the SDK gives it no default, so 0.1.0-mainnet.1 — which sent
+    // "swarm-mainnet" — could not create a wallet at all.
     await waitFor(() => expect(native.init_new).toHaveBeenCalled());
-    expect((native.init_new as jest.Mock).mock.calls[0][1]).toBe("swarm-mainnet");
+    expect((native.init_new as jest.Mock).mock.calls[0][1]).toBe(
+      `swarm-mainnet:${SWARM_MAINNET_PROFILE.genesis}`,
+    );
     expect((native.init_new as jest.Mock).mock.calls[0][0]).toBe(MAINNET_SERVER);
+    // And the same hint had to reach the call that runs first, which is where
+    // the owner met the error.
+    expect((native.wallet_exists as jest.Mock).mock.calls[0][1]).toBe(
+      `swarm-mainnet:${SWARM_MAINNET_PROFILE.genesis}`,
+    );
   });
 
   it("builds a testnet wallet on the testnet chain", async () => {

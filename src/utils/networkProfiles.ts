@@ -226,6 +226,37 @@ export const chainHintFor = (profile: SwarmNetworkProfile): string => {
 };
 
 /**
+ * The chain hint for any chain label the application can hold, SWARM or not.
+ *
+ * THE ONE PLACE a chain label becomes a chain hint. Every `native.*` call that
+ * takes one goes through this, and `src/utils/nativeChainHint.test.ts` fails
+ * the build if a call site stops doing so.
+ *
+ * It exists because on 2026-09-26 the owner pressed Create on the first
+ * mainnet build and got
+ *
+ *   initializing wallet: 'swarm-mainnet' does not name a network. The SWARM
+ *   production network is opened as 'swarm-mainnet:<genesis>'
+ *
+ * `chainHintFor` had been written, documented and tested, and nothing called
+ * it: all seven `native.wallet_exists` / `init_*` / `delete_wallet` call sites
+ * passed `wallet.chain_name` straight through, which is right for every chain
+ * the addon knew when they were written and wrong for the only one added
+ * since. A correct function nobody calls is not a fix.
+ *
+ * Upstream Zcash's `main`, `test` and `regtest` pass through unchanged: their
+ * hint IS the bare label, the addon has always been sent it, and a legacy
+ * wallet on one of them still has to be found on disk so it can be named and
+ * deleted. Anything unrecognised passes through too, for the same reason — the
+ * addon's own error is a better answer than a guess made here.
+ */
+export const nativeChainHint = (chain: string | undefined | null): string => {
+  const profile = swarmProfileFor(chain);
+  if (profile) return chainHintFor(profile);
+  return chain ?? "";
+};
+
+/**
  * A copy of `profile` carrying `genesis`, for the release that ships the hash
  * and for the tests that have to exercise a launched production network.
  *

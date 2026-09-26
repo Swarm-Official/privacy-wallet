@@ -19,6 +19,7 @@ import fetchServerList from "../../utils/fetchServerList";
 import selectFastestServer, { RACE_CANDIDATES } from "../../utils/selectFastestServer";
 import Utils from "../../utils/utils";
 import { userFacingError } from "../../utils/userFacingError";
+import { nativeChainHint } from "../../utils/networkProfiles";
 import { Logo } from "../logo";
 import DetailLine from "../detailLine/DetailLine";
 
@@ -335,7 +336,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       // MAINNET
       const mainnetWalletExistsResult: boolean = await native.wallet_exists(
         "",
-        ServerChainNameEnum.mainChainName,
+        nativeChainHint(ServerChainNameEnum.mainChainName),
         PerformanceLevelEnum.High,
         3,
         "",
@@ -379,7 +380,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       // TESTNET
       const testnetWalletExistsResult: boolean = await native.wallet_exists(
         "",
-        ServerChainNameEnum.testChainName,
+        nativeChainHint(ServerChainNameEnum.testChainName),
         PerformanceLevelEnum.High,
         3,
         "",
@@ -423,7 +424,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       // REGTEST
       const regnetWalletExistsResult: boolean = await native.wallet_exists(
         "",
-        ServerChainNameEnum.regtestChainName,
+        nativeChainHint(ServerChainNameEnum.regtestChainName),
         PerformanceLevelEnum.High,
         3,
         "",
@@ -549,7 +550,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       // trying to recover it
       const mainnetWalletExistsResult: boolean = await native.wallet_exists(
         "",
-        ServerChainNameEnum.mainChainName,
+        nativeChainHint(ServerChainNameEnum.mainChainName),
         PerformanceLevelEnum.High,
         3,
         "",
@@ -598,7 +599,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       // trying to recover it
       const testnetWalletExistsResult: boolean = await native.wallet_exists(
         "",
-        ServerChainNameEnum.testChainName,
+        nativeChainHint(ServerChainNameEnum.testChainName),
         PerformanceLevelEnum.High,
         3,
         "",
@@ -647,7 +648,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       // trying to recover it
       const regnetWalletExistsResult: boolean = await native.wallet_exists(
         "",
-        ServerChainNameEnum.regtestChainName,
+        nativeChainHint(ServerChainNameEnum.regtestChainName),
         PerformanceLevelEnum.High,
         3,
         "",
@@ -767,7 +768,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
       this.setStep("checking wallet file");
       const walletExistsResult: boolean = await native.wallet_exists(
         currentWallet.uri,
-        currentWallet.chain_name,
+        nativeChainHint(currentWallet.chain_name),
         currentWallet.performanceLevel,
         3,
         currentWallet.fileName,
@@ -795,7 +796,7 @@ class LoadingScreen extends Component<LoadingScreenProps, LoadingScreenState> {
         this.setStep("opening wallet");
         const result: string = await native.init_from_b64(
           currentWallet.uri,
-          currentWallet.chain_name,
+          nativeChainHint(currentWallet.chain_name),
           currentWallet.performanceLevel,
           3,
           currentWallet.fileName,

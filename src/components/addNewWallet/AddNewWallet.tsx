@@ -26,7 +26,12 @@ import {
   swarmPresetsForChain,
   swarmUnreachableMessage,
 } from "../../utils/swarmNetwork";
-import { SWARM_MAINNET_PROFILE, SWARM_NETWORK_PROFILES, SWARM_TESTNET_PROFILE } from "../../utils/networkProfiles";
+import {
+  SWARM_MAINNET_PROFILE,
+  SWARM_NETWORK_PROFILES,
+  SWARM_TESTNET_PROFILE,
+  nativeChainHint,
+} from "../../utils/networkProfiles";
 import { ServerIdentity, checkServerIdentityForChain } from "../../utils/serverIdentity";
 import { native, ipcRenderer } from "../../electronBridge";
 import { useLocation } from "react-router-dom";
@@ -374,7 +379,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       console.log(next, nextWalletName);
       const walletExistsResult: boolean = await native.wallet_exists(
         selectedServer,
-        selectedChain ? selectedChain : ServerChainNameEnum.mainChainName,
+        nativeChainHint(selectedChain ? selectedChain : ServerChainNameEnum.mainChainName),
         performanceLevel,
         3,
         nextWalletName,
@@ -421,7 +426,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       await clearTimers();
       const result: string = await native.init_new(
         selectedServer,
-        selectedChain ? selectedChain : ServerChainNameEnum.mainChainName,
+        nativeChainHint(selectedChain ? selectedChain : ServerChainNameEnum.mainChainName),
         performanceLevel,
         3,
         wallet_name,
@@ -457,7 +462,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
         seedPhrase,
         Number(birthday),
         selectedServer,
-        selectedChain ? selectedChain : ServerChainNameEnum.mainChainName,
+        nativeChainHint(selectedChain ? selectedChain : ServerChainNameEnum.mainChainName),
         performanceLevel,
         3,
         wallet_name,
@@ -534,7 +539,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
         ufvkInput,
         Number(birthday),
         selectedServer,
-        effectiveChain,
+        nativeChainHint(effectiveChain),
         performanceLevel,
         3,
         wallet_name,
@@ -570,7 +575,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
       await clearTimers();
       const result: string = await native.init_from_b64(
         selectedServer,
-        selectedChain ? selectedChain : ServerChainNameEnum.mainChainName,
+        nativeChainHint(selectedChain ? selectedChain : ServerChainNameEnum.mainChainName),
         performanceLevel,
         3,
         wallet_name,
@@ -774,7 +779,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
         await clearTimers();
         const walletExistsResult: boolean = await native.wallet_exists(
           currentWallet.uri,
-          currentWallet.chain_name,
+          nativeChainHint(currentWallet.chain_name),
           currentWallet.performanceLevel,
           3,
           currentWallet.fileName,
@@ -827,7 +832,7 @@ const AddNewWallet: React.FC<AddNewWalletProps> = ({
           if (currentWallet.creationType !== CreationTypeEnum.File) {
             const resultDelete: string = await native.delete_wallet(
               currentWallet.uri,
-              currentWallet.chain_name,
+              nativeChainHint(currentWallet.chain_name),
               currentWallet.performanceLevel,
               3,
               currentWallet.fileName ? currentWallet.fileName : "zingo-wallet.dat",

@@ -66,12 +66,12 @@ a separate fact, and it lives in `src/buildProfile.json`:
 
 | | `swarm-testnet` | `swarm-mainnet` |
 | --- | --- | --- |
-| version | `0.1.0-testnet.9` | `0.1.0-mainnet.1` |
+| version | `0.1.0-testnet.9` | `0.1.0-mainnet.2` |
 | product name | SWARM Wallet (Testnet) | SWARM Wallet |
 | executable | `SWARM Wallet Testnet` | `SWARM Wallet` |
 | app id | `green.swarm.wallet.testnet` | `green.swarm.wallet` |
 | package name | `swarm-wallet-testnet` | `swarm-wallet-mainnet` |
-| Windows installer | `SWARM-Wallet-0.1.0-testnet.9-win-x64-setup.exe` | `SWARM-Wallet-0.1.0-mainnet.1-win-x64-setup.exe` |
+| Windows installer | `SWARM-Wallet-0.1.0-testnet.9-win-x64-setup.exe` | `SWARM-Wallet-0.1.0-mainnet.2-win-x64-setup.exe` |
 | starts on | `https://lwd.swarm.green:443` | `https://lwd-main.swarm.green:8443` |
 
 `scripts/set-build-profile.js` is the only thing that writes the selection, from
@@ -99,6 +99,35 @@ Why this file exists at all: the first mainnet build, `b6174f2d` on 2026-09-26,
 carried the real mainnet genesis and still called itself "SWARM Wallet
 (Testnet)" version `0.1.0-testnet.9`, because those facts were four literals in
 four files and only the genesis had been moved.
+
+`0.1.0-mainnet.1` was withdrawn the same day: it could not create a wallet at
+all. See "The chain hint" below.
+
+## The chain hint
+
+The addon's first argument is a chain **hint**, not a chain label, and for
+SWARM production the two differ: `ChainType::SwarmMainnet` carries the genesis
+and the SDK gives it no default, so the hint is
+`swarm-mainnet:01c34428…2c39afdd`. For `main`, `test`, `regtest` and
+`swarm-testnet` the hint and the label are the same string.
+
+`nativeChainHint` in `src/utils/networkProfiles.ts` is the one place a label
+becomes a hint, and every `native.wallet_exists`, `init_new`,
+`init_from_seed`, `init_from_ufvk`, `init_from_b64` and `delete_wallet` call
+goes through it. `src/utils/nativeChainHint.test.ts` reads the source of all
+fifteen call sites and fails the build if any of them passes anything else.
+
+That test exists because `chainHintFor` was written, documented and tested
+first, and nothing called it. Every call site passed `wallet.chain_name`
+straight through, and `src/native.node.d.ts` typed the parameter
+`ServerChainNameEnum`, so the compiler agreed. `0.1.0-mainnet.1` shipped, and
+the owner pressed Create:
+
+    initializing wallet: 'swarm-mainnet' does not name a network. The SWARM
+    production network is opened as 'swarm-mainnet:<genesis>'
+
+The parameter is now typed `SwarmChainHint` — a plain string — so nobody can
+believe the compiler is checking it.
 
 ## The servers this application offers
 

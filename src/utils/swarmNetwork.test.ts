@@ -56,7 +56,7 @@ describe("the network this build is for", () => {
   // to call itself the testnet one.
   it("has one identity per network, and they are different applications", () => {
     expect(BUILD_IDENTITIES["swarm-mainnet"]).toMatchObject({
-      version: "0.1.0-mainnet.1",
+      version: "0.1.0-mainnet.2",
       productName: "SWARM Wallet",
       appId: "green.swarm.wallet",
       packageName: "swarm-wallet-mainnet",
